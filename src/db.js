@@ -2,6 +2,8 @@ const sql = require('mssql');
 require('dotenv').config();
 
 // .env dosyasındaki değişkenleri kullanarak bir konfigürasyon nesnesi oluşturuyoruz.
+// // Konfigurationsobjekt aus den .env-Variablen laden
+
 const config = {
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
@@ -10,6 +12,9 @@ const config = {
   options: {
     // Windows Authentication kullanılıyorsa trustedConnection true olmalı.
     // DB_USER boş ise Windows Auth varsayıyoruz. Bu bizim için en önemli satır.
+    // Wenn Windows-Authentifizierung verwendet wird, muss trustedConnection auf true gesetzt werden.
+    // Falls DB_USER leer ist, nehmen wir Windows Auth an. Das ist für uns die wichtigste Zeile.
+
     trustedConnection: !process.env.DB_USER, 
     encrypt: true, 
     trustServerCertificate: true // localhost geliştirme ortamı için sertifika hatalarını önler
@@ -18,6 +23,8 @@ const config = {
 };
 
 // Bağlantı havuzunu (connection pool) oluşturup bağlanmaya çalışıyoruz.
+// Wir erstellen den Connection-Pool und versuchen, die Verbindung herzustellen.
+
 const poolPromise = new sql.ConnectionPool(config)
   .connect()
   .then(pool => {
@@ -28,6 +35,9 @@ const poolPromise = new sql.ConnectionPool(config)
 
 // Bağlantı havuzunu ve sql nesnesini dışa aktarıyoruz.
 // Bunları controller dosyalarımızda sorgu yapmak için kullanacağız.
+// Wir exportieren den Connection-Pool und das SQL-Objekt.
+// Diese werden wir in unseren Controller-Dateien für Abfragen verwenden.
+
 module.exports = {
   sql, poolPromise
 };
