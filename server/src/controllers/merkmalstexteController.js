@@ -1,6 +1,6 @@
 const { poolPromise, sql } = require('../db');
 
-// READ ALL
+// Bütün kayıtları getiren fonksiyon (READ ALL)
 const getAllMerkmalstexte = async (req, res) => {
   try {
     const pool = await poolPromise;
@@ -11,7 +11,7 @@ const getAllMerkmalstexte = async (req, res) => {
   }
 };
 
-// READ ONE
+// ID'ye göre tek bir kayıt getiren fonksiyon (READ ONE)
 const getMerkmalstextById = async (req, res) => {
   const { id } = req.params;
   try {
@@ -29,7 +29,7 @@ const getMerkmalstextById = async (req, res) => {
   }
 };
 
-// CREATE
+// Yeni bir kayıt oluşturan fonksiyon (CREATE)
 const createMerkmalstext = async (req, res) => {
   const { identnr, merkmal, auspraegung, drucktext } = req.body;
   try {
@@ -49,7 +49,7 @@ const createMerkmalstext = async (req, res) => {
   }
 };
 
-// UPDATE
+// Bir kaydı güncelleyen fonksiyon (UPDATE)
 const updateMerkmalstext = async (req, res) => {
   const { id } = req.params;
   const { identnr, merkmal, auspraegung, drucktext } = req.body;
@@ -72,7 +72,45 @@ const updateMerkmalstext = async (req, res) => {
   }
 };
 
-// DELETE
+// Bir kaydı kısmen güncelleyen fonksiyon (PATCH)
+const patchMerkmalstext = async (req, res) => {
+  const { id } = req.params;
+  const updates = req.body;
+  
+  // Güncelleme yapılacak alanları ve değerlerini ayırıyoruz
+  const allowedFields = ['identnr', 'merkmal', 'auspraegung', 'drucktext'];
+  const fieldsToUpdate = Object.keys(updates).filter(field => allowedFields.includes(field));
+  
+  if (fieldsToUpdate.length === 0) {
+    return res.status(400).send('Güncellenecek geçerli bir alan bulunamadı.');
+  }
+  
+  try {
+    const pool = await poolPromise;
+    let query = 'UPDATE merkmalstexte SET ';
+    const setClause = fieldsToUpdate.map(field => `${field} = @${field}`).join(', ');
+    query += setClause + ' OUTPUT INSERTED.* WHERE id = @id';
+    
+    const request = pool.request().input('id', sql.Int, id);
+    
+    // Her alan için uygun SQL tipini belirliyoruz
+    fieldsToUpdate.forEach(field => {
+      request.input(field, sql.VarChar, updates[field]);
+    });
+    
+    const result = await request.query(query);
+    
+    if (result.recordset.length === 0) {
+      return res.status(404).send('Bu ID ile kayıt bulunamadı.');
+    }
+    
+    res.status(200).json(result.recordset[0]);
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
+};
+
+// Bir kaydı silen fonksiyon (DELETE)
 const deleteMerkmalstext = async (req, res) => {
   const { id } = req.params;
   try {
@@ -93,5 +131,6 @@ module.exports = {
   getMerkmalstextById,
   createMerkmalstext,
   updateMerkmalstext,
+  patchMerkmalstext,
   deleteMerkmalstext,
 };

@@ -2,8 +2,7 @@ const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
-const merkmalstexteRoutes = require('./routes/merkmalstexteRoutes');
-// const { poolPromise } = require('./db'); // kommentiert, bis die DB-Verbindung getestet wird
+const { poolPromise } = require('./db');
 const app = express();
 
 // Security middleware
@@ -20,6 +19,9 @@ app.use(limiter);
 
 app.use(express.json());
 
+// Route'ları import et / Routen importieren
+const merkmalstexteRoutes = require('./routes/merkmalstexteRoutes');
+
 // Test endpoint
 app.get('/', (req, res) => {
   res.json({ 
@@ -29,13 +31,24 @@ app.get('/', (req, res) => {
 });
 
 // Database test endpoint
-/*
 app.get('/db-test', async (req, res) => {
-  // Database bağlantısı hazır olduğunda bu kısmı açın
+  try {
+    const pool = await poolPromise;
+    res.json({ 
+      message: 'Database connection successful!',
+      timestamp: new Date().toISOString()
+    });
+  } catch (err) {
+    res.status(500).json({ 
+      message: 'Database connection failed',
+      error: err.message 
+    });
+  }
 });
-*/
 
 // API rotalarını /api öneki ile kullan
+
 app.use('/api', merkmalstexteRoutes);
+
 
 module.exports = app;
