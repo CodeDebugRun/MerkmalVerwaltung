@@ -12,7 +12,11 @@ function App() {
     identnr: '',
     merkmal: '',
     auspraegung: '',
-    drucktext: ''
+    drucktext: '',
+    sondermerkmal: '',
+    position: '',
+    sonderAbt: '',
+    fListe: ''
   });
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -69,7 +73,11 @@ function App() {
       identnr: item.identnr || '',
       merkmal: item.merkmal || '',
       auspraegung: item.auspraegung || '',
-      drucktext: item.drucktext || ''
+      drucktext: item.drucktext || '',
+      sondermerkmal: item.sondermerkmal || '',
+      position: item.position || '',
+      sonderAbt: item.sonderAbt || '',
+      fListe: item.fListe || ''
     });
     setShowForm(true);
   };
@@ -79,7 +87,11 @@ function App() {
       identnr: '',
       merkmal: '',
       auspraegung: '',
-      drucktext: ''
+      drucktext: '',
+      sondermerkmal: '',
+      position: '',
+      sonderAbt: '',
+      fListe: ''
     });
     setEditingItem(null);
     setShowForm(false);
@@ -101,6 +113,10 @@ function App() {
       item.merkmal?.toLowerCase().includes(searchLower) ||
       item.auspraegung?.toLowerCase().includes(searchLower) ||
       item.drucktext?.toLowerCase().includes(searchLower) ||
+      item.sondermerkmal?.toLowerCase().includes(searchLower) ||
+      item.position?.toLowerCase().includes(searchLower) ||
+      item.sonderAbt?.toLowerCase().includes(searchLower) ||
+      item.fListe?.toLowerCase().includes(searchLower) ||
       item.id?.toString().includes(searchTerm)
     );
   });
@@ -191,6 +207,42 @@ function App() {
                   required
                 />
               </div>
+              <div className="form-group">
+                <label>Sondermerkmal:</label>
+                <input
+                  type="text"
+                  name="sondermerkmal"
+                  value={formData.sondermerkmal}
+                  onChange={handleInputChange}
+                />
+              </div>
+              <div className="form-group">
+                <label>Position:</label>
+                <input
+                  type="text"
+                  name="position"
+                  value={formData.position}
+                  onChange={handleInputChange}
+                />
+              </div>
+              <div className="form-group">
+                <label>Sonder Abt.:</label>
+                <input
+                  type="text"
+                  name="sonderAbt"
+                  value={formData.sonderAbt}
+                  onChange={handleInputChange}
+                />
+              </div>
+              <div className="form-group">
+                <label>F-Liste:</label>
+                <input
+                  type="text"
+                  name="fListe"
+                  value={formData.fListe}
+                  onChange={handleInputChange}
+                />
+              </div>
               <div className="form-buttons">
                 <button type="submit" className="btn btn-primary">
                   {editingItem ? 'Update' : 'Create'}
@@ -216,10 +268,14 @@ function App() {
                 <thead>
                   <tr>
                     <th>ID</th>
-                    <th>Ident Nr</th>
+                    <th>Identnr</th>
                     <th>Merkmal</th>
                     <th>Ausprägung</th>
                     <th>Drucktext</th>
+                    <th>Sondermerkmal</th>
+                    <th>Position</th>
+                    <th>Sonder Abt.</th>
+                    <th>F-Liste</th>
                     <th>Aktionen</th>
                   </tr>
                 </thead>
@@ -231,6 +287,10 @@ function App() {
                       <td>{item.merkmal}</td>
                       <td>{item.auspraegung}</td>
                       <td>{item.drucktext}</td>
+                      <td>{item.sondermerkmal}</td>
+                      <td>{item.position}</td>
+                      <td>{item.sonderAbt}</td>
+                      <td>{item.fListe}</td>
                       <td className="actions">
                         <button 
                           className="btn btn-edit" 

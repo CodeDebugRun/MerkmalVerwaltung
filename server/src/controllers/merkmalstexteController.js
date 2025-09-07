@@ -31,7 +31,7 @@ const getMerkmalstextById = async (req, res) => {
 
 // Yeni bir kayıt oluşturan fonksiyon (CREATE)
 const createMerkmalstext = async (req, res) => {
-  const { identnr, merkmal, auspraegung, drucktext } = req.body;
+  const { identnr, merkmal, auspraegung, drucktext, sondermerkmal, position, sonderAbt, fListe } = req.body;
   try {
     const pool = await poolPromise;
     const result = await pool.request()
@@ -39,9 +39,13 @@ const createMerkmalstext = async (req, res) => {
       .input('merkmal', sql.VarChar, merkmal)
       .input('auspraegung', sql.VarChar, auspraegung)
       .input('drucktext', sql.VarChar, drucktext)
-      .query(`INSERT INTO merkmalstexte (identnr, merkmal, auspraegung, drucktext) 
+      .input('sondermerkmal', sql.VarChar, sondermerkmal || null)
+      .input('position', sql.VarChar, position || null)
+      .input('sonderAbt', sql.VarChar, sonderAbt || null)
+      .input('fListe', sql.VarChar, fListe || null)
+      .query(`INSERT INTO merkmalstexte (identnr, merkmal, auspraegung, drucktext, sondermerkmal, position, sonderAbt, fListe) 
               OUTPUT INSERTED.* 
-              VALUES (@identnr, @merkmal, @auspraegung, @drucktext)`);
+              VALUES (@identnr, @merkmal, @auspraegung, @drucktext, @sondermerkmal, @position, @sonderAbt, @fListe)`);
 
     res.status(201).json(result.recordset[0]);
   } catch (err) {
@@ -52,7 +56,7 @@ const createMerkmalstext = async (req, res) => {
 // Bir kaydı güncelleyen fonksiyon (UPDATE)
 const updateMerkmalstext = async (req, res) => {
   const { id } = req.params;
-  const { identnr, merkmal, auspraegung, drucktext } = req.body;
+  const { identnr, merkmal, auspraegung, drucktext, sondermerkmal, position, sonderAbt, fListe } = req.body;
   try {
     const pool = await poolPromise;
     const result = await pool.request()
@@ -61,8 +65,13 @@ const updateMerkmalstext = async (req, res) => {
       .input('merkmal', sql.VarChar, merkmal)
       .input('auspraegung', sql.VarChar, auspraegung)
       .input('drucktext', sql.VarChar, drucktext)
+      .input('sondermerkmal', sql.VarChar, sondermerkmal || null)
+      .input('position', sql.VarChar, position || null)
+      .input('sonderAbt', sql.VarChar, sonderAbt || null)
+      .input('fListe', sql.VarChar, fListe || null)
       .query(`UPDATE merkmalstexte 
-              SET identnr = @identnr, merkmal = @merkmal, auspraegung = @auspraegung, drucktext = @drucktext 
+              SET identnr = @identnr, merkmal = @merkmal, auspraegung = @auspraegung, drucktext = @drucktext,
+                  sondermerkmal = @sondermerkmal, position = @position, sonderAbt = @sonderAbt, fListe = @fListe
               OUTPUT INSERTED.*
               WHERE id = @id`);
     
@@ -78,7 +87,7 @@ const patchMerkmalstext = async (req, res) => {
   const updates = req.body;
   
   // Güncelleme yapılacak alanları ve değerlerini ayırıyoruz
-  const allowedFields = ['identnr', 'merkmal', 'auspraegung', 'drucktext'];
+  const allowedFields = ['identnr', 'merkmal', 'auspraegung', 'drucktext', 'sondermerkmal', 'position', 'sonderAbt', 'fListe'];
   const fieldsToUpdate = Object.keys(updates).filter(field => allowedFields.includes(field));
   
   if (fieldsToUpdate.length === 0) {
