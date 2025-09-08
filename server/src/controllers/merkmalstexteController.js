@@ -51,19 +51,9 @@ const getMerkmalstextById = async (req, res) => {
 
 // Yeni bir kayıt oluşturan fonksiyon (CREATE)
 const createMerkmalstext = async (req, res) => {
-  console.log('*** CREATE FUNCTION BAŞLADI ***');
   const { identnr, merkmal, auspraegung, drucktext, sondermerkmal, position, sonderAbt, fertigungsliste } = req.body;
   try {
     const pool = await poolPromise;
-    
-    console.log('Creating new record with all fields:', { identnr, merkmal, auspraegung, drucktext, sondermerkmal, position, sonderAbt, fertigungsliste });
-    
-    // Database schema'yı kontrol et
-    const schemaCheck = await pool.request().query(`
-      SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS 
-      WHERE TABLE_NAME = 'merkmalstexte'
-    `);
-    console.log('Available columns:', schemaCheck.recordset.map(r => r.COLUMN_NAME));
     
     const result = await pool.request()
       .input('identnr', sql.VarChar, identnr)
