@@ -8,7 +8,9 @@ const {
   reorderPositions, 
   bulkUpdatePositions,
   getNextAvailablePosition, 
-  getCurrentPosition 
+  getCurrentPosition,
+  validatePositionUniqueness,
+  findNextSafePosition
 } = require('../utils/positionManager');
 
 // Bütün kayıtları getiren fonksiyon (READ ALL)
@@ -88,6 +90,13 @@ const createMerkmalstext = async (req, res, next) => {
     
     // Execute within transaction for data integrity with position shifting
     const result = await withTransaction(pool, async (transaction) => {
+      // Validate position uniqueness with row-level locking
+      const isPositionUnique = await validatePositionUniqueness(transaction, finalPosition);
+      if (!isPositionUnique) {
+        finalPosition = await findNextSafePosition(transaction, finalPosition);
+        console.log(`🔄 Position angepasst auf: ${finalPosition}`);
+      }
+      
       // LEGACY LOGIC: Shift existing positions up before inserting
       await shiftPositionsUp(transaction, finalPosition);
       
@@ -225,21 +234,27 @@ const patchMerkmalstext = async (req, res, next) => {
   
   try {
     const pool = await poolPromise;
-    const result = await pool.request()
-      .input('id', sql.Int, id)
-      .input('identnr', sql.VarChar, identnr)
-      .input('merkmal', sql.VarChar, merkmal)
-      .input('auspraegung', sql.VarChar, auspraegung)
-      .input('drucktext', sql.VarChar, drucktext)
-      .input('sondermerkmal', sql.VarChar, sondermerkmal || '')
-      .input('merkmalsposition', sql.Int, position ? parseInt(position) : null)
-      .input('maka', sql.Int, sonderAbt ? parseInt(sonderAbt) : null)
-      .input('fertigungsliste', sql.Int, fertigungsliste ? parseInt(fertigungsliste) : null)
-      .query(`UPDATE merkmalstexte 
-              SET identnr = @identnr, merkmal = @merkmal, auspraegung = @auspraegung, drucktext = @drucktext,
-                  sondermerkmal = @sondermerkmal, merkmalsposition = @merkmalsposition, maka = @maka, fertigungsliste = @fertigungsliste
-              WHERE id = @id;
-              SELECT * FROM merkmalstexte WHERE id = @id`);
+    
+    // Execute within transaction for data integrity
+    const result = await withTransaction(pool, async (transaction) => {
+      const request = createRequest(transaction);
+      
+      return await request
+        .input('id', sql.Int, id)
+        .input('identnr', sql.VarChar, identnr)
+        .input('merkmal', sql.VarChar, merkmal)
+        .input('auspraegung', sql.VarChar, auspraegung)
+        .input('drucktext', sql.VarChar, drucktext)
+        .input('sondermerkmal', sql.VarChar, sondermerkmal || '')
+        .input('merkmalsposition', sql.Int, position ? parseInt(position) : null)
+        .input('maka', sql.Int, sonderAbt ? parseInt(sonderAbt) : null)
+        .input('fertigungsliste', sql.Int, fertigungsliste ? parseInt(fertigungsliste) : null)
+        .query(`UPDATE merkmalstexte 
+                SET identnr = @identnr, merkmal = @merkmal, auspraegung = @auspraegung, drucktext = @drucktext,
+                    sondermerkmal = @sondermerkmal, merkmalsposition = @merkmalsposition, maka = @maka, fertigungsliste = @fertigungsliste
+                OUTPUT INSERTED.*
+                WHERE id = @id`);
+    });
     
     if (result.recordset.length === 0) {
       return res.status(404).json(formatError('Datensatz mit dieser ID wurde nicht gefunden'));

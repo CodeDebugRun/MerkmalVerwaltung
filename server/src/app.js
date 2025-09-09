@@ -5,6 +5,7 @@ const rateLimit = require('express-rate-limit');
 const { poolPromise } = require('./db');
 const errorHandler = require('./middleware/errorHandler');
 const { formatSuccess, formatError } = require('./utils/responseFormatter');
+const connectionManager = require('./utils/connectionManager');
 const app = express();
 
 // Security middleware
@@ -20,6 +21,9 @@ const limiter = rateLimit({
   legacyHeaders: false
 });
 app.use(limiter);
+
+// Database health check middleware
+app.use('/api', connectionManager.healthCheckMiddleware());
 
 app.use(express.json());
 

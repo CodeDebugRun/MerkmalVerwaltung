@@ -180,11 +180,72 @@ const getCurrentPosition = async (pool, recordId) => {
   return result.recordset.length > 0 ? result.recordset[0].merkmalsposition : null;
 };
 
+/**
+ * Validate position uniqueness with row-level locking
+ * Prevents concurrent position conflicts
+ */
+const validatePositionUniqueness = async (transaction, position, excludeId = null) => {
+  if (!position || position <= 0) {
+    return true; // Allow null/invalid positions without validation
+  }
+
+  const request = new sql.Request(transaction);
+  
+  let query = `
+    SELECT COUNT(*) as count 
+    FROM merkmalstexte WITH (UPDLOCK, ROWLOCK)
+    WHERE merkmalsposition = @position
+  `;
+  
+  request.input('position', sql.Int, position);
+  
+  if (excludeId) {
+    query += ` AND id != @excludeId`;
+    request.input('excludeId', sql.Int, excludeId);
+  }
+  
+  const result = await request.query(query);
+  const conflictCount = result.recordset[0].count;
+  
+  if (conflictCount > 0) {
+    console.log(`⚠️ Position ${position} bereits vergeben - automatische Anpassung`);
+    return false;
+  }
+  
+  return true;
+};
+
+/**
+ * Find next safe position when conflict detected
+ */
+const findNextSafePosition = async (transaction, desiredPosition) => {
+  const request = new sql.Request(transaction);
+  
+  // Find the next available position starting from desired position
+  const result = await request
+    .input('startPos', sql.Int, desiredPosition)
+    .query(`
+      WITH NumberSeries AS (
+        SELECT @startPos + ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) - 1 as pos
+        FROM merkmalstexte
+      )
+      SELECT TOP 1 ns.pos
+      FROM NumberSeries ns
+      LEFT JOIN merkmalstexte m ON ns.pos = m.merkmalsposition
+      WHERE m.merkmalsposition IS NULL
+      ORDER BY ns.pos
+    `);
+    
+  return result.recordset.length > 0 ? result.recordset[0].pos : desiredPosition + 100;
+};
+
 module.exports = {
   shiftPositionsUp,
   shiftPositionsDown,
   reorderPositions,
   bulkUpdatePositions,
   getNextAvailablePosition,
-  getCurrentPosition
+  getCurrentPosition,
+  validatePositionUniqueness,
+  findNextSafePosition
 };
