@@ -3,6 +3,8 @@ const helmet = require('helmet');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 const { poolPromise } = require('./db');
+const errorHandler = require('./middleware/errorHandler');
+const { formatSuccess, formatError } = require('./utils/responseFormatter');
 const app = express();
 
 // Security middleware
@@ -12,8 +14,10 @@ app.use(cors());
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 1 * 60 * 1000,
-  max: 100,
-  message: 'Too many requests, please wait.'
+  max: 50,
+  message: formatError('Zu viele Anfragen, bitte warten Sie.'),
+  standardHeaders: true,
+  legacyHeaders: false
 });
 app.use(limiter);
 
@@ -24,25 +28,16 @@ const merkmalstexteRoutes = require('./routes/merkmalstexteRoutes');
 
 // Test endpoint
 app.get('/', (req, res) => {
-  res.json({ 
-    message: 'API is running!',
-    timestamp: new Date().toISOString()
-  });
+  res.json(formatSuccess(null, 'API läuft erfolgreich!'));
 });
 
 // Database test endpoint
 app.get('/db-test', async (req, res) => {
   try {
     const pool = await poolPromise;
-    res.json({ 
-      message: 'Database connection successful!',
-      timestamp: new Date().toISOString()
-    });
+    res.json(formatSuccess(null, 'Datenbankverbindung erfolgreich!'));
   } catch (err) {
-    res.status(500).json({ 
-      message: 'Database connection failed',
-      error: err.message 
-    });
+    res.status(500).json(formatError('Datenbankverbindung fehlgeschlagen'));
   }
 });
 
@@ -50,5 +45,7 @@ app.get('/db-test', async (req, res) => {
 
 app.use('/api', merkmalstexteRoutes);
 
+// Global error handling middleware (must be last)
+app.use(errorHandler);
 
 module.exports = app;
