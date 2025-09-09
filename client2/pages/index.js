@@ -25,6 +25,15 @@ export default function Home() {
   });
   const [searchTerm, setSearchTerm] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+  const [filterData, setFilterData] = useState({
+    identnr: '',
+    merkmal: '',
+    auspraegung: '',
+    position: '',
+    sonderAbt: '',
+    fertigungsliste: ''
+  });
 
   // API endpoint
   const API_BASE = '/api/merkmalstexte';
@@ -78,6 +87,66 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Filter function with multiple criteria
+  const fetchFilteredData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Build query params from filter data
+      const queryParams = new URLSearchParams();
+      Object.entries(filterData).forEach(([key, value]) => {
+        if (value && value.toString().trim()) {
+          queryParams.append(key, value.toString().trim());
+        }
+      });
+      
+      const endpoint = queryParams.toString() 
+        ? `${API_BASE}/filter?${queryParams.toString()}`
+        : API_BASE;
+        
+      const response = await axios.get(endpoint);
+      
+      // Handle API response format
+      if (response.data.success && response.data.data) {
+        setMerkmalstexte(response.data.data);
+        showSuccess(`${response.data.data.length} Datensätze gefunden`);
+      } else {
+        setMerkmalstexte(Array.isArray(response.data) ? response.data : []);
+      }
+    } catch (err) {
+      handleApiError(err, 'Fehler beim Filtern der Daten');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle filter input changes
+  const handleFilterChange = (field, value) => {
+    setFilterData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  // Clear all filters
+  const clearFilters = () => {
+    setFilterData({
+      identnr: '',
+      merkmal: '',
+      auspraegung: '',
+      position: '',
+      sonderAbt: '',
+      fertigungsliste: ''
+    });
+    fetchMerkmalstexte(); // Reload all data
+  };
+
+  // Apply filters
+  const applyFilters = () => {
+    fetchFilteredData();
   };
 
   const handleSubmit = async (e) => {
@@ -249,6 +318,13 @@ export default function Home() {
             {showForm ? 'Abbrechen' : 'Neu hinzufügen'}
           </button>
           <button 
+            className="btn btn-info" 
+            onClick={() => setShowFilters(!showFilters)}
+            disabled={loading}
+          >
+            {showFilters ? 'Filter schließen' : '🔍 Filter'}
+          </button>
+          <button 
             className="btn btn-secondary" 
             onClick={fetchMerkmalstexte}
             disabled={loading}
@@ -271,6 +347,127 @@ export default function Home() {
             >
               ×
             </button>
+          </div>
+        )}
+
+        {/* Advanced Filter Panel */}
+        {showFilters && (
+          <div className="filter-panel">
+            <div className="filter-header">
+              <h3>🔍 Erweiterte Filter</h3>
+              <div className="filter-controls">
+                <button className="btn btn-sm btn-success" onClick={applyFilters}>
+                  Anwenden
+                </button>
+                <button className="btn btn-sm btn-secondary" onClick={clearFilters}>
+                  Zurücksetzen
+                </button>
+              </div>
+            </div>
+            
+            <div className="filter-grid">
+              {/* Text Inputs */}
+              <div className="filter-group">
+                <label>Identr:</label>
+                <input
+                  type="text"
+                  value={filterData.identnr}
+                  onChange={(e) => handleFilterChange('identnr', e.target.value)}
+                  placeholder="z.B. T0001"
+                  className="filter-input"
+                />
+              </div>
+              
+              <div className="filter-group">
+                <label>Merkmal:</label>
+                <input
+                  type="text"
+                  value={filterData.merkmal}
+                  onChange={(e) => handleFilterChange('merkmal', e.target.value)}
+                  placeholder="z.B. UNT_LACK_AS"
+                  className="filter-input"
+                />
+              </div>
+              
+              <div className="filter-group">
+                <label>Ausprägung:</label>
+                <input
+                  type="text"
+                  value={filterData.auspraegung}
+                  onChange={(e) => handleFilterChange('auspraegung', e.target.value)}
+                  placeholder="z.B. LFG"
+                  className="filter-input"
+                />
+              </div>
+              
+              <div className="filter-group">
+                <label>Position:</label>
+                <input
+                  type="number"
+                  value={filterData.position}
+                  onChange={(e) => handleFilterChange('position', e.target.value)}
+                  placeholder="z.B. 300"
+                  className="filter-input"
+                  min="1"
+                />
+              </div>
+              
+              {/* Sonder Abt Dropdown */}
+              <div className="filter-group">
+                <label>Sonder Abt.:</label>
+                <select
+                  value={filterData.sonderAbt}
+                  onChange={(e) => handleFilterChange('sonderAbt', e.target.value)}
+                  className="filter-input"
+                >
+                  <option value="">Alle</option>
+                  <option value="1">🖤 schwarz</option>
+                  <option value="2">💙 blau</option>
+                  <option value="3">❤️ rot</option>
+                  <option value="4">🧡 orange</option>
+                  <option value="5">💚 grün</option>
+                  <option value="6">🤍 weiss</option>
+                  <option value="7">💛 gelb</option>
+                </select>
+              </div>
+              
+              {/* Fertigungsliste Checkboxes */}
+              <div className="filter-group">
+                <label>Fertigungsliste:</label>
+                <div className="checkbox-filter">
+                  <label className="checkbox-option">
+                    <input
+                      type="radio"
+                      name="fertigungsliste-filter"
+                      value=""
+                      checked={filterData.fertigungsliste === ''}
+                      onChange={(e) => handleFilterChange('fertigungsliste', e.target.value)}
+                    />
+                    Alle
+                  </label>
+                  <label className="checkbox-option">
+                    <input
+                      type="radio"
+                      name="fertigungsliste-filter"
+                      value="1"
+                      checked={filterData.fertigungsliste === '1'}
+                      onChange={(e) => handleFilterChange('fertigungsliste', e.target.value)}
+                    />
+                    ✅ Ja
+                  </label>
+                  <label className="checkbox-option">
+                    <input
+                      type="radio"
+                      name="fertigungsliste-filter"
+                      value="0"
+                      checked={filterData.fertigungsliste === '0'}
+                      onChange={(e) => handleFilterChange('fertigungsliste', e.target.value)}
+                    />
+                    ❌ Nein
+                  </label>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 

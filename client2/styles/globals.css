@@ -375,3 +375,127 @@ a {
     padding: 0.5rem;
   }
 }
+
+/* Filter Panel Styles */
+.filter-panel {
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  padding: 20px;
+  margin: 20px 0;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.filter-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  border-bottom: 1px solid #dee2e6;
+  padding-bottom: 10px;
+}
+
+.filter-header h3 {
+  margin: 0;
+  color: #495057;
+  font-size: 1.2rem;
+}
+
+.filter-controls {
+  display: flex;
+  gap: 10px;
+}
+
+.filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+  align-items: start;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.filter-group label {
+  font-weight: 500;
+  margin-bottom: 5px;
+  color: #495057;
+  font-size: 0.9rem;
+}
+
+.filter-input {
+  padding: 8px 12px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+.filter-input:focus {
+  outline: 0;
+  border-color: #80bdff;
+  box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25);
+}
+
+.checkbox-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.checkbox-option {
+  display: flex;
+  align-items: center;
+  font-size: 0.9rem;
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+.checkbox-option input[type="radio"] {
+  margin-right: 8px;
+  cursor: pointer;
+}
+
+.checkbox-option:hover {
+  background-color: #e9ecef;
+  border-radius: 4px;
+  padding: 4px 8px;
+}
+
+/* Button styles */
+.btn-info {
+  background-color: #17a2b8;
+  color: white;
+  border: 1px solid #17a2b8;
+}
+
+.btn-info:hover {
+  background-color: #138496;
+  border-color: #117a8b;
+}
+
+.btn-sm {
+  padding: 5px 10px;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  border-radius: 3px;
+}
+
+/* Responsive filter grid */
+@media (max-width: 768px) {
+  .filter-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .filter-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  
+  .filter-controls {
+    justify-content: center;
+  }
+}
