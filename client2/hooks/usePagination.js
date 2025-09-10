@@ -15,6 +15,7 @@ export const usePagination = (endpoint = '/merkmalstexte', initialPageSize = 50,
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [currentFilters, setCurrentFilters] = useState({});
 
   const fetchData = useCallback(async (page = 1, pageSize = initialPageSize, customFilters = {}) => {
     try {
@@ -35,7 +36,22 @@ export const usePagination = (endpoint = '/merkmalstexte', initialPageSize = 50,
         }
       });
 
-      const response = await axios.get(`${API_BASE_URL}${endpoint}`, { params });
+      // Use filter endpoint if there are any filters applied, otherwise use the regular endpoint
+      const hasFilters = Object.keys(customFilters).some(key => 
+        customFilters[key] !== undefined && 
+        customFilters[key] !== null && 
+        customFilters[key] !== ''
+      ) || Object.keys(filters).some(key => 
+        filters[key] !== undefined && 
+        filters[key] !== null && 
+        filters[key] !== ''
+      );
+      
+      const apiEndpoint = hasFilters && endpoint === '/merkmalstexte' 
+        ? `${API_BASE_URL}/merkmalstexte/filter` 
+        : `${API_BASE_URL}${endpoint}`;
+      
+      const response = await axios.get(apiEndpoint, { params });
       
       if (response.data && response.data.success) {
         const { data: responseData, pagination: paginationData } = response.data.data;
@@ -71,8 +87,8 @@ export const usePagination = (endpoint = '/merkmalstexte', initialPageSize = 50,
 
   const goToPage = useCallback((page) => {
     const safePage = Math.max(1, Math.min(page, pagination.totalPages));
-    fetchData(safePage, pagination.pageSize);
-  }, [fetchData]);
+    fetchData(safePage, pagination.pageSize, currentFilters);
+  }, [fetchData, pagination.totalPages, pagination.pageSize, currentFilters]);
 
   const nextPage = useCallback(() => {
     if (pagination.hasNextPage) {
@@ -92,12 +108,13 @@ export const usePagination = (endpoint = '/merkmalstexte', initialPageSize = 50,
   }, [fetchData]);
 
   const refresh = useCallback(() => {
-    fetchData(pagination.currentPage, pagination.pageSize);
-  }, [fetchData]);
+    fetchData(pagination.currentPage, pagination.pageSize, currentFilters);
+  }, [fetchData, pagination.currentPage, pagination.pageSize, currentFilters]);
 
   const search = useCallback((searchFilters) => {
+    setCurrentFilters(searchFilters);
     fetchData(1, pagination.pageSize, searchFilters); // Go to first page when searching
-  }, [fetchData]);
+  }, [fetchData, pagination.pageSize]);
 
   // Initial data fetch - only run once on mount
   useEffect(() => {

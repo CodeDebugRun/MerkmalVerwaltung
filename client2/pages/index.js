@@ -349,11 +349,34 @@ export default function Home() {
               />
               <input
                 type="number"
-                placeholder="Position"
+                placeholder="Merkmalposition"
                 value={filterData.position}
                 onChange={(e) => handleFilterChange('position', e.target.value)}
                 className="filter-input"
               />
+              <select
+                value={filterData.sonderAbt}
+                onChange={(e) => handleFilterChange('sonderAbt', e.target.value)}
+                className="filter-input"
+              >
+                <option value="">Sonder Abt.: Alle</option>
+                <option value="1">1 - schwarz</option>
+                <option value="2">2 - blau</option>
+                <option value="3">3 - rot</option>
+                <option value="4">4 - orange</option>
+                <option value="5">5 - grün</option>
+                <option value="6">6 - weiss</option>
+                <option value="7">7 - gelb</option>
+              </select>
+              <select
+                value={filterData.fertigungsliste}
+                onChange={(e) => handleFilterChange('fertigungsliste', e.target.value)}
+                className="filter-input"
+              >
+                <option value="">Fertigungsliste: Alle</option>
+                <option value="1">Fertigungsliste: Ja</option>
+                <option value="0">Fertigungsliste: Nein</option>
+              </select>
             </div>
             <div className="filter-buttons">
               <button 
@@ -754,6 +777,7 @@ export default function Home() {
           gap: 15px;
           justify-content: center;
         }
+
 
         .data-form {
           max-width: 800px;
