@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
 import Head from 'next/head';
 import { usePagination } from '../hooks/usePagination';
@@ -35,6 +35,22 @@ export default function Home() {
     sonderAbt: '',
     fertigungsliste: ''
   });
+  const [darkMode, setDarkMode] = useState(false);
+
+  // Dark mode localStorage'dan yükle
+  useEffect(() => {
+    const savedDarkMode = localStorage.getItem('darkMode');
+    if (savedDarkMode) {
+      setDarkMode(JSON.parse(savedDarkMode));
+    }
+  }, []);
+
+  // Dark mode toggle function
+  const toggleDarkMode = () => {
+    const newDarkMode = !darkMode;
+    setDarkMode(newDarkMode);
+    localStorage.setItem('darkMode', JSON.stringify(newDarkMode));
+  };
 
   // Pagination Hook verwenden
   const {
@@ -255,7 +271,7 @@ export default function Home() {
   };
 
   return (
-    <div className="App">
+    <div className={`App ${darkMode ? 'dark-mode' : ''}`}>
       <Head>
         <title>Merkmalstexte Verwaltung - LEBO</title>
         <meta name="description" content="LEBO Merkmalstexte Management System" />
@@ -264,7 +280,7 @@ export default function Home() {
 
       <header className="App-header">
         <div className="header-top">
-          <h1>📊 Merkmalstexte Verwaltung</h1>
+          <h1>Lebo Merkmaltexte Verwaltung</h1>
         </div>
         <div className="header-center">
           <div className="search-container">
@@ -317,6 +333,13 @@ export default function Home() {
             disabled={loading}
           >
             {loading ? '⏳ Lädt...' : '🔄 Aktualisieren'}
+          </button>
+          <button 
+            className="btn btn-secondary" 
+            onClick={toggleDarkMode}
+            title={darkMode ? "Light Mode aktivieren" : "Dark Mode aktivieren"}
+          >
+            {darkMode ? '◐' : '●'}
           </button>
         </div>
       </header>
@@ -616,7 +639,11 @@ export default function Home() {
                       <td>{item.sondermerkmal || '-'}</td>
                       <td>{item.position || '-'}</td>
                       <td>{getSonderAbtDisplay(item.sonderAbt || item.maka)}</td>
-                      <td>{item.fertigungsliste === 1 ? '✅' : '❌'}</td>
+                      <td>
+                        <span style={{ color: item.fertigungsliste === 1 ? '#586069' : '#8b949e' }}>
+                          {item.fertigungsliste === 1 ? '✓' : '✗'}
+                        </span>
+                      </td>
                       <td>
                         <div className="action-buttons">
                           <button
@@ -657,17 +684,38 @@ export default function Home() {
       </main>
 
       <style jsx>{`
+        /* PASTEL COLOR SCHEME - EYE-FRIENDLY DESIGN */
+        :root {
+          --primary-bg: #fafbfc;
+          --secondary-bg: #ffffff;
+          --accent-bg: #f6f8fa;
+          --border-color: #e1e4e8;
+          --text-primary: #586069;
+          --text-secondary: #8b949e;
+          --text-muted: #6a737d;
+          --pastel-blue: #dbeafe;
+          --pastel-green: #dcfce7;
+          --pastel-yellow: #fef3c7;
+          --pastel-red: #fecaca;
+          --pastel-purple: #e9d5ff;
+          --pastel-indigo: #e0e7ff;
+          --soft-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+          --medium-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+        }
+
         .App {
           text-align: center;
-          background-color: #f5f5f5;
+          background: linear-gradient(135deg, #fafbfc 0%, #f6f8fa 100%);
           min-height: 100vh;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         }
 
         .App-header {
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          padding: 20px;
-          color: white;
-          box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+          background: linear-gradient(135deg, #ffffff 0%, #f6f8fa 100%);
+          padding: 24px 20px;
+          color: var(--text-primary);
+          box-shadow: var(--soft-shadow);
+          border-bottom: 1px solid var(--border-color);
         }
 
         .header-top {
@@ -676,12 +724,14 @@ export default function Home() {
 
         .header-top h1 {
           margin: 0;
-          font-size: 2.2em;
-          font-weight: 600;
+          font-size: 1.6em;
+          font-weight: 500;
+          color: #586069;
+          letter-spacing: -0.5px;
         }
 
         .header-center {
-          margin: 15px 0;
+          margin: 20px 0;
         }
 
         .search-container {
@@ -695,43 +745,42 @@ export default function Home() {
 
         .search-input {
           flex: 1;
-          padding: 12px 45px 12px 15px;
-          border: 2px solid rgba(255, 255, 255, 0.3);
-          border-radius: 25px;
-          background: rgba(255, 255, 255, 0.15);
-          color: white;
+          padding: 12px 45px 12px 16px;
+          border: 2px solid #e1e4e8;
+          border-radius: 24px;
+          background: #ffffff;
+          color: #586069;
           font-size: 14px;
           transition: all 0.3s ease;
-          backdrop-filter: blur(10px);
         }
 
         .search-input::placeholder {
-          color: rgba(255, 255, 255, 0.7);
+          color: #6a737d;
         }
 
         .search-input:focus {
           outline: none;
-          border-color: rgba(255, 255, 255, 0.6);
-          background: rgba(255, 255, 255, 0.2);
-          box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+          border-color: #a5b4fc;
+          background: #ffffff;
+          box-shadow: 0 0 0 3px rgba(165, 180, 252, 0.1);
         }
 
         .search-button {
           position: absolute;
-          right: 8px;
+          right: 6px;
           padding: 8px 12px;
-          background: rgba(255, 255, 255, 0.2);
-          border: none;
-          border-radius: 20px;
+          background: #e0e7ff;
+          border: 1px solid #c7d2fe;
+          border-radius: 18px;
           cursor: pointer;
           transition: all 0.3s ease;
-          font-size: 16px;
-          backdrop-filter: blur(10px);
+          font-size: 14px;
+          color: #586069;
         }
 
         .search-button:hover:not(:disabled) {
-          background: rgba(255, 255, 255, 0.3);
-          transform: scale(1.1);
+          background: #c7d2fe;
+          transform: translateY(-1px);
         }
 
         .search-button:disabled {
@@ -742,7 +791,7 @@ export default function Home() {
 
         .header-buttons {
           display: flex;
-          gap: 15px;
+          gap: 12px;
           justify-content: center;
           flex-wrap: wrap;
         }
@@ -750,137 +799,247 @@ export default function Home() {
         .App-main {
           max-width: 1400px;
           margin: 0 auto;
-          padding: 30px 20px;
+          padding: 24px 20px;
         }
 
         .btn {
-          padding: 12px 20px;
-          border: none;
+          padding: 10px 20px;
+          border: 1px solid transparent;
           border-radius: 8px;
           cursor: pointer;
-          font-weight: 600;
+          font-weight: 500;
           transition: all 0.3s ease;
           font-size: 14px;
+          line-height: 1.4;
         }
 
         .btn:hover:not(:disabled) {
-          transform: translateY(-2px);
-          box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+          transform: translateY(-1px);
+          box-shadow: var(--medium-shadow);
         }
 
         .btn:disabled {
-          opacity: 0.6;
+          opacity: 0.5;
           cursor: not-allowed;
           transform: none;
         }
 
         .btn-primary {
-          background: #007bff;
-          color: white;
+          background: #dbeafe;
+          color: #1e40af;
+          border-color: #bfdbfe;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+          background: #bfdbfe;
+          border-color: #93c5fd;
         }
 
         .btn-secondary {
-          background: #6c757d;
-          color: white;
+          background: #f6f8fa;
+          color: #586069;
+          border-color: #e1e4e8;
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+          background: #f1f3f4;
+          border-color: #d0d7de;
         }
 
         .btn-info {
-          background: #17a2b8;
-          color: white;
+          background: #e0e7ff;
+          color: #4338ca;
+          border-color: #c7d2fe;
+        }
+
+        .btn-info:hover:not(:disabled) {
+          background: #c7d2fe;
+          border-color: #a5b4fc;
         }
 
         .btn-success {
-          background: #28a745;
-          color: white;
+          background: #dcfce7;
+          color: #15803d;
+          border-color: #bbf7d0;
+        }
+
+        .btn-success:hover:not(:disabled) {
+          background: #bbf7d0;
+          border-color: #86efac;
         }
 
         .btn-small {
-          padding: 8px 12px;
+          padding: 6px 12px;
           font-size: 12px;
-          border: none;
-          border-radius: 4px;
+          border: 1px solid transparent;
+          border-radius: 6px;
           cursor: pointer;
           margin: 2px;
+          font-weight: 500;
+          transition: all 0.3s ease;
         }
 
         .btn-edit {
-          background: #ffc107;
-          color: #212529;
+          background: transparent;
+          color: #586069;
+          border: none;
+        }
+
+        .btn-edit:hover:not(:disabled) {
+          background: #f6f8fa;
+          color: #586069;
+          border: none;
+          transform: translateY(-1px);
         }
 
         .btn-delete {
-          background: #dc3545;
-          color: white;
+          background: transparent;
+          color: #586069;
+          border: none;
+        }
+
+        .btn-delete:hover:not(:disabled) {
+          background: #f6f8fa;
+          color: #586069;
+          border: none;
+          transform: translateY(-1px);
         }
 
         .success-message, .error-message {
-          background: #d4edda;
-          border: 1px solid #c3e6cb;
-          color: #155724;
-          padding: 15px;
-          border-radius: 8px;
+          background: #dcfce7;
+          border: 1px solid #bbf7d0;
+          color: #15803d;
+          padding: 16px 20px;
+          border-radius: 12px;
           margin-bottom: 20px;
           display: flex;
           justify-content: space-between;
           align-items: center;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
         }
 
         .error-message {
-          background: #f8d7da;
-          border-color: #f5c6cb;
-          color: #721c24;
+          background: #fecaca;
+          border-color: #fca5a5;
+          color: #dc2626;
         }
 
         .close-btn {
           background: none;
           border: none;
-          font-size: 20px;
+          font-size: 18px;
           cursor: pointer;
-          padding: 0 5px;
-          margin-left: 10px;
+          padding: 4px 8px;
+          margin-left: 12px;
+          border-radius: 4px;
+          color: inherit;
+          opacity: 0.7;
+          transition: all 0.3s ease;
+        }
+
+        .close-btn:hover {
+          opacity: 1;
+          background: rgba(0, 0, 0, 0.05);
         }
 
         .filter-section, .form-section, .data-section {
-          background: white;
-          border-radius: 12px;
-          padding: 25px;
-          margin-bottom: 25px;
-          box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+          background: #ffffff;
+          border-radius: 16px;
+          padding: 28px;
+          margin-bottom: 24px;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+          border: 2px solid #e1e4e8;
+          animation: slideInDown 0.4s ease-out;
+          transform-origin: top;
+        }
+
+        @keyframes slideInDown {
+          0% {
+            opacity: 0;
+            transform: translateY(-20px) scale(0.95);
+          }
+          100% {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
         }
 
         .filter-section h3, .form-section h3, .data-section h3 {
           margin-top: 0;
-          color: #333;
-          font-size: 1.4em;
+          margin-bottom: 20px;
+          color: #586069;
+          font-size: 1.3em;
+          font-weight: 500;
+          animation: fadeInUp 0.4s ease-out;
+          animation-fill-mode: both;
+          animation-delay: 0.1s;
         }
 
         .filter-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-          gap: 15px;
-          margin-bottom: 20px;
+          grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+          gap: 16px;
+          margin-bottom: 24px;
         }
 
+        .filter-grid .filter-input:nth-child(1) { animation-delay: 0.1s; }
+        .filter-grid .filter-input:nth-child(2) { animation-delay: 0.15s; }
+        .filter-grid .filter-input:nth-child(3) { animation-delay: 0.2s; }
+        .filter-grid .filter-input:nth-child(4) { animation-delay: 0.25s; }
+        .filter-grid .filter-input:nth-child(5) { animation-delay: 0.3s; }
+        .filter-grid .filter-input:nth-child(6) { animation-delay: 0.35s; }
+
         .filter-input, .form-input {
-          padding: 12px;
-          border: 2px solid #e9ecef;
+          padding: 12px 16px;
+          border: 2px solid #e1e4e8;
           border-radius: 8px;
           font-size: 14px;
-          transition: border-color 0.3s ease;
+          transition: all 0.3s ease;
+          background: #ffffff;
+          color: #586069;
+          animation: fadeInUp 0.5s ease-out;
+          animation-fill-mode: both;
+        }
+
+        @keyframes fadeInUp {
+          0% {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+          100% {
+            opacity: 1;
+            transform: translateY(0);
+          }
         }
 
         .filter-input:focus, .form-input:focus {
           outline: none;
-          border-color: #007bff;
-          box-shadow: 0 0 0 3px rgba(0,123,255,0.1);
+          border-color: #a5b4fc;
+          box-shadow: 0 0 0 3px rgba(165, 180, 252, 0.1);
+        }
+
+        .filter-input::placeholder, .form-input::placeholder {
+          color: #6a737d;
         }
 
         .filter-buttons {
           display: flex;
-          gap: 15px;
+          gap: 12px;
           justify-content: center;
+          animation: fadeInUp 0.6s ease-out;
+          animation-fill-mode: both;
+          animation-delay: 0.2s;
         }
 
+        .form-buttons {
+          display: flex;
+          gap: 12px;
+          justify-content: center;
+          margin-top: 28px;
+          animation: fadeInUp 0.6s ease-out;
+          animation-fill-mode: both;
+          animation-delay: 0.3s;
+        }
 
         .data-form {
           max-width: 800px;
@@ -890,40 +1049,36 @@ export default function Home() {
         .form-row {
           display: grid;
           grid-template-columns: 1fr 1fr;
-          gap: 15px;
-          margin-bottom: 15px;
+          gap: 16px;
+          margin-bottom: 16px;
         }
 
-        .form-buttons {
-          display: flex;
-          gap: 15px;
-          justify-content: center;
-          margin-top: 25px;
-        }
 
         .data-header {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          margin-bottom: 20px;
+          margin-bottom: 24px;
         }
 
         .data-info {
-          color: #6c757d;
+          color: #8b949e;
           margin: 0;
           font-size: 14px;
+          font-weight: 400;
         }
 
         .loading-container {
           text-align: center;
           padding: 60px 20px;
-          color: #6c757d;
+          color: #8b949e;
         }
 
         .loading-spinner {
-          font-size: 3em;
-          margin-bottom: 15px;
+          font-size: 2.5em;
+          margin-bottom: 16px;
           animation: spin 2s linear infinite;
+          color: #6a737d;
         }
 
         @keyframes spin {
@@ -934,48 +1089,53 @@ export default function Home() {
         .empty-state {
           text-align: center;
           padding: 60px 20px;
-          color: #6c757d;
+          color: #8b949e;
         }
 
         .empty-icon {
-          font-size: 4em;
+          font-size: 3.5em;
           margin-bottom: 20px;
+          color: #6a737d;
         }
 
         .table-container {
           overflow-x: auto;
-          border-radius: 8px;
-          border: 1px solid #dee2e6;
+          border-radius: 12px;
+          border: 2px solid #e1e4e8;
+          background: #ffffff;
         }
 
         .data-table {
           width: 100%;
           border-collapse: collapse;
-          background: white;
+          background: #ffffff;
         }
 
         .data-table th {
-          background: #f8f9fa;
-          padding: 15px 10px;
+          background: #f6f8fa;
+          padding: 16px 12px;
           text-align: left;
-          font-weight: 600;
-          color: #495057;
-          border-bottom: 2px solid #dee2e6;
+          font-weight: 500;
+          color: #586069;
+          border-bottom: 2px solid #e1e4e8;
+          font-size: 14px;
         }
 
         .data-table td {
-          padding: 15px 10px;
-          border-bottom: 1px solid #dee2e6;
+          padding: 14px 12px;
+          border-bottom: 1px solid #e1e4e8;
           vertical-align: middle;
+          color: #586069;
+          font-size: 14px;
         }
 
         .data-table tr:hover {
-          background: #f8f9fa;
+          background: #f6f8fa;
         }
 
         .action-buttons {
           display: flex;
-          gap: 5px;
+          gap: 6px;
           justify-content: center;
         }
 
@@ -998,6 +1158,126 @@ export default function Home() {
             align-items: flex-start;
             gap: 10px;
           }
+        }
+
+        /* Dark Mode Styles */
+        .App.dark-mode {
+          background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+          color: #e1e4e8;
+        }
+
+        .App.dark-mode .App-header {
+          background: linear-gradient(135deg, #2d2d2d 0%, #3a3a3a 100%);
+          border-bottom: 1px solid #444;
+        }
+
+        .App.dark-mode .header-top h1 {
+          color: #e1e4e8;
+        }
+
+        .App.dark-mode .search-input {
+          background: #3a3a3a;
+          border-color: #555;
+          color: #e1e4e8;
+        }
+
+        .App.dark-mode .search-input::placeholder {
+          color: #888;
+        }
+
+        .App.dark-mode .search-button {
+          background: #4a4a4a;
+          border-color: #555;
+          color: #e1e4e8;
+        }
+
+        .App.dark-mode .btn {
+          background: #4a4a4a;
+          border-color: #555;
+          color: #e1e4e8;
+        }
+
+        .App.dark-mode .btn:hover:not(:disabled) {
+          background: #555;
+          border-color: #666;
+        }
+
+        .App.dark-mode .btn-primary {
+          background: #1e3a8a;
+          border-color: #1e40af;
+          color: #dbeafe;
+        }
+
+        .App.dark-mode .btn-primary:hover:not(:disabled) {
+          background: #1e40af;
+          border-color: #3b82f6;
+        }
+
+        .App.dark-mode .filter-section, .App.dark-mode .form-section, .App.dark-mode .data-section {
+          background: #2d2d2d;
+          border-color: #444;
+        }
+
+        .App.dark-mode .filter-section h3, .App.dark-mode .form-section h3, .App.dark-mode .data-section h3 {
+          color: #e1e4e8;
+        }
+
+        .App.dark-mode .filter-input, .App.dark-mode .form-input {
+          background: #3a3a3a;
+          border-color: #555;
+          color: #e1e4e8;
+        }
+
+        .App.dark-mode .filter-input::placeholder, .App.dark-mode .form-input::placeholder {
+          color: #888;
+        }
+
+        .App.dark-mode .table-container {
+          border-color: #444;
+          background: #2d2d2d;
+        }
+
+        .App.dark-mode .data-table {
+          background: #2d2d2d;
+        }
+
+        .App.dark-mode .data-table th {
+          background: #3a3a3a;
+          border-color: #444;
+          color: #e1e4e8;
+        }
+
+        .App.dark-mode .data-table td {
+          border-color: #444;
+          color: #e1e4e8;
+        }
+
+        .App.dark-mode .data-table tr:hover {
+          background: #3a3a3a;
+        }
+
+        .App.dark-mode .success-message {
+          background: #1a4d3a;
+          border-color: #2d7d5a;
+          color: #86efac;
+        }
+
+        .App.dark-mode .error-message {
+          background: #4d1a1a;
+          border-color: #7d2d2d;
+          color: #fca5a5;
+        }
+
+        .App.dark-mode .loading-container {
+          color: #888;
+        }
+
+        .App.dark-mode .empty-state {
+          color: #888;
+        }
+
+        .App.dark-mode .data-info {
+          color: #888;
         }
       `}</style>
     </div>
