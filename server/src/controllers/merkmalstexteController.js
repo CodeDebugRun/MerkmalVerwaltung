@@ -251,7 +251,7 @@ const updateMerkmalstext = async (req, res, next) => {
 // Bir kaydı kısmen güncelleyen fonksiyon (PATCH)
 const patchMerkmalstext = async (req, res, next) => {
   const { id } = req.params;
-  const { identnr, merkmal, auspraegung, drucktext, sondermerkmal, position, sonderAbt, fertigungsliste } = req.body;
+  const updateFields = req.body;
   
   // Validate ID
   const idValidation = validateId(id);
@@ -259,34 +259,68 @@ const patchMerkmalstext = async (req, res, next) => {
     return res.status(400).json(formatValidationError(idValidation.errors));
   }
   
-  // Validate input data (partial update)
-  const validation = validateMerkmalstexte(req.body, true);
-  if (!validation.isValid) {
-    return res.status(400).json(formatValidationError(validation.errors));
-  }
+  // For PATCH, we skip validation since we're only updating provided fields
+  // The validation will be handled by database constraints
   
   try {
     const pool = await poolPromise;
     
     // Execute within transaction for data integrity
     const result = await withTransaction(pool, async (transaction) => {
+      // First, get the current record
+      const getCurrentRequest = createRequest(transaction);
+      const currentResult = await getCurrentRequest
+        .input('id', sql.Int, id)
+        .query('SELECT * FROM merkmalstexte WHERE id = @id');
+        
+      if (currentResult.recordset.length === 0) {
+        throw new Error('Datensatz mit dieser ID wurde nicht gefunden');
+      }
+      
+      // Build dynamic UPDATE query for only provided fields
+      let setParts = [];
       const request = createRequest(transaction);
       
-      return await request
-        .input('id', sql.Int, id)
-        .input('identnr', sql.VarChar, identnr)
-        .input('merkmal', sql.VarChar, merkmal)
-        .input('auspraegung', sql.VarChar, auspraegung)
-        .input('drucktext', sql.VarChar, drucktext)
-        .input('sondermerkmal', sql.VarChar, sondermerkmal || '')
-        .input('merkmalsposition', sql.Int, position ? parseInt(position) : null)
-        .input('maka', sql.Int, sonderAbt ? parseInt(sonderAbt) : null)
-        .input('fertigungsliste', sql.Int, fertigungsliste ? parseInt(fertigungsliste) : null)
-        .query(`UPDATE merkmalstexte 
-                SET identnr = @identnr, merkmal = @merkmal, auspraegung = @auspraegung, drucktext = @drucktext,
-                    sondermerkmal = @sondermerkmal, merkmalsposition = @merkmalsposition, maka = @maka, fertigungsliste = @fertigungsliste
-                OUTPUT INSERTED.*
-                WHERE id = @id`);
+      // Map frontend field names to database field names and add to query if provided
+      const fieldMappings = {
+        identnr: 'identnr',
+        merkmal: 'merkmal', 
+        auspraegung: 'auspraegung',
+        drucktext: 'drucktext',
+        sondermerkmal: 'sondermerkmal',
+        position: 'merkmalsposition',
+        sonderAbt: 'maka',
+        fertigungsliste: 'fertigungsliste'
+      };
+      
+      Object.entries(updateFields).forEach(([frontendField, value]) => {
+        const dbField = fieldMappings[frontendField];
+        if (dbField && value !== undefined) {
+          setParts.push(`${dbField} = @${frontendField}`);
+          
+          // Handle different data types
+          if (frontendField === 'position' || frontendField === 'sonderAbt' || frontendField === 'fertigungsliste') {
+            request.input(frontendField, sql.Int, value ? parseInt(value) : null);
+          } else {
+            request.input(frontendField, sql.VarChar, value || '');
+          }
+        }
+      });
+      
+      if (setParts.length === 0) {
+        throw new Error('Keine gültigen Felder zum Aktualisieren bereitgestellt');
+      }
+      
+      // Execute update with only the provided fields
+      request.input('id', sql.Int, id);
+      const updateQuery = `
+        UPDATE merkmalstexte 
+        SET ${setParts.join(', ')}
+        OUTPUT INSERTED.*
+        WHERE id = @id
+      `;
+      
+      return await request.query(updateQuery);
     });
     
     if (result.recordset.length === 0) {
@@ -381,7 +415,7 @@ const bulkUpdateMerkmalstextePositions = async (req, res, next) => {
 
 // Advanced filtering endpoint - Legacy merkmalstexte.jsp functionality
 const getFilteredMerkmalstexte = async (req, res, next) => {
-  const { identnr, merkmal, auspraegung, drucktext, sondermerkmal, position, sonderAbt, fertigungsliste, page, limit } = req.query;
+  const { identnr, merkmal, auspraegung, drucktext, sondermerkmal, position, sonderAbt, fertigungsliste, quickSearch, page, limit } = req.query;
   
   try {
     const pool = await poolPromise;
@@ -395,44 +429,58 @@ const getFilteredMerkmalstexte = async (req, res, next) => {
     // Build dynamic WHERE clause
     let whereConditions = [];
     
-    if (identnr) {
-      whereConditions.push('identnr LIKE @identnr');
-      request.input('identnr', sql.VarChar, `%${identnr}%`);
-    }
-    
-    if (merkmal) {
-      whereConditions.push('merkmal LIKE @merkmal');
-      request.input('merkmal', sql.VarChar, `%${merkmal}%`);
-    }
-    
-    if (auspraegung) {
-      whereConditions.push('auspraegung LIKE @auspraegung');
-      request.input('auspraegung', sql.VarChar, `%${auspraegung}%`);
-    }
-    
-    if (drucktext) {
-      whereConditions.push('drucktext LIKE @drucktext');
-      request.input('drucktext', sql.VarChar, `%${drucktext}%`);
-    }
-    
-    if (sondermerkmal) {
-      whereConditions.push('sondermerkmal LIKE @sondermerkmal');
-      request.input('sondermerkmal', sql.VarChar, `%${sondermerkmal}%`);
-    }
-    
-    if (position) {
-      whereConditions.push('merkmalsposition = @position');
-      request.input('position', sql.Int, parseInt(position));
-    }
-    
-    if (sonderAbt) {
-      whereConditions.push('maka = @sonderAbt');
-      request.input('sonderAbt', sql.Int, parseInt(sonderAbt));
-    }
-    
-    if (fertigungsliste) {
-      whereConditions.push('fertigungsliste = @fertigungsliste');
-      request.input('fertigungsliste', sql.Int, parseInt(fertigungsliste));
+    // Quick search - searches across multiple fields
+    if (quickSearch) {
+      const searchTerm = `%${quickSearch}%`;
+      whereConditions.push(`(
+        identnr LIKE @quickSearch OR 
+        merkmal LIKE @quickSearch OR 
+        auspraegung LIKE @quickSearch OR 
+        drucktext LIKE @quickSearch OR 
+        sondermerkmal LIKE @quickSearch
+      )`);
+      request.input('quickSearch', sql.VarChar, searchTerm);
+    } else {
+      // Individual field filters (only if no quickSearch)
+      if (identnr) {
+        whereConditions.push('identnr LIKE @identnr');
+        request.input('identnr', sql.VarChar, `%${identnr}%`);
+      }
+      
+      if (merkmal) {
+        whereConditions.push('merkmal LIKE @merkmal');
+        request.input('merkmal', sql.VarChar, `%${merkmal}%`);
+      }
+      
+      if (auspraegung) {
+        whereConditions.push('auspraegung LIKE @auspraegung');
+        request.input('auspraegung', sql.VarChar, `%${auspraegung}%`);
+      }
+      
+      if (drucktext) {
+        whereConditions.push('drucktext LIKE @drucktext');
+        request.input('drucktext', sql.VarChar, `%${drucktext}%`);
+      }
+      
+      if (sondermerkmal) {
+        whereConditions.push('sondermerkmal LIKE @sondermerkmal');
+        request.input('sondermerkmal', sql.VarChar, `%${sondermerkmal}%`);
+      }
+      
+      if (position) {
+        whereConditions.push('merkmalsposition = @position');
+        request.input('position', sql.Int, parseInt(position));
+      }
+      
+      if (sonderAbt) {
+        whereConditions.push('maka = @sonderAbt');
+        request.input('sonderAbt', sql.Int, parseInt(sonderAbt));
+      }
+      
+      if (fertigungsliste) {
+        whereConditions.push('fertigungsliste = @fertigungsliste');
+        request.input('fertigungsliste', sql.Int, parseInt(fertigungsliste));
+      }
     }
     
     const whereClause = whereConditions.length > 0 ? ' WHERE ' + whereConditions.join(' AND ') : '';

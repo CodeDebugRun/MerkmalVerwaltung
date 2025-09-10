@@ -22,6 +22,7 @@ export default function Home() {
     sonderAbt: '0',
     fertigungsliste: '0'
   });
+  const [searchTerm, setSearchTerm] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [filterData, setFilterData] = useState({
@@ -84,7 +85,23 @@ export default function Home() {
     }));
   };
 
-  // Suche durchführen
+  // Schnelle Suche durchführen
+  const handleQuickSearch = () => {
+    if (searchTerm.trim()) {
+      // Suche in mehreren Feldern gleichzeitig
+      const searchFilter = {
+        quickSearch: searchTerm.trim()
+      };
+      search(searchFilter);
+      showSuccess(`🔍 Suche nach "${searchTerm.trim()}"`);
+    } else {
+      // Leere Suche = alle Daten laden
+      search({});
+      showSuccess('✅ Alle Daten geladen');
+    }
+  };
+
+  // Suche durchführen (erweiterte Filter)
   const handleSearch = () => {
     const activeFilters = Object.keys(filterData).reduce((acc, key) => {
       if (filterData[key] && filterData[key].toString().trim() !== '') {
@@ -111,6 +128,7 @@ export default function Home() {
       sonderAbt: '',
       fertigungsliste: ''
     });
+    setSearchTerm(''); // Arama terimini de temizle
     search({}); // Alle Daten neu laden
     showSuccess('✅ Filter gelöscht');
   };
@@ -247,6 +265,31 @@ export default function Home() {
       <header className="App-header">
         <div className="header-top">
           <h1>📊 Merkmalstexte Verwaltung</h1>
+        </div>
+        <div className="header-center">
+          <div className="search-container">
+            <input
+              type="text"
+              placeholder="Suchen..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter') {
+                  handleQuickSearch();
+                }
+              }}
+              className="search-input"
+              disabled={loading}
+            />
+            <button 
+              className="search-button"
+              onClick={handleQuickSearch}
+              disabled={loading}
+              title="Suchen"
+            >
+              🔍
+            </button>
+          </div>
         </div>
         <div className="header-buttons">
           <button 
@@ -635,6 +678,66 @@ export default function Home() {
           margin: 0;
           font-size: 2.2em;
           font-weight: 600;
+        }
+
+        .header-center {
+          margin: 15px 0;
+        }
+
+        .search-container {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          max-width: 400px;
+          margin: 0 auto;
+          position: relative;
+        }
+
+        .search-input {
+          flex: 1;
+          padding: 12px 45px 12px 15px;
+          border: 2px solid rgba(255, 255, 255, 0.3);
+          border-radius: 25px;
+          background: rgba(255, 255, 255, 0.15);
+          color: white;
+          font-size: 14px;
+          transition: all 0.3s ease;
+          backdrop-filter: blur(10px);
+        }
+
+        .search-input::placeholder {
+          color: rgba(255, 255, 255, 0.7);
+        }
+
+        .search-input:focus {
+          outline: none;
+          border-color: rgba(255, 255, 255, 0.6);
+          background: rgba(255, 255, 255, 0.2);
+          box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+        }
+
+        .search-button {
+          position: absolute;
+          right: 8px;
+          padding: 8px 12px;
+          background: rgba(255, 255, 255, 0.2);
+          border: none;
+          border-radius: 20px;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          font-size: 16px;
+          backdrop-filter: blur(10px);
+        }
+
+        .search-button:hover:not(:disabled) {
+          background: rgba(255, 255, 255, 0.3);
+          transform: scale(1.1);
+        }
+
+        .search-button:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+          transform: none;
         }
 
         .header-buttons {
