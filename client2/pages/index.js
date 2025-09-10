@@ -237,7 +237,11 @@ export default function Home() {
         throw new Error(response.data.message || 'Unbekannter Fehler');
       }
     } catch (err) {
-      handleApiError(err, 'Fehler beim Löschen');
+      if (err.code === 'NETWORK_ERROR' || err.message === 'Network Error') {
+        showError('🔌 Server ist nicht erreichbar. Bitte prüfen Sie die Verbindung.');
+      } else {
+        handleApiError(err, 'Fehler beim Löschen');
+      }
     } finally {
       setOperationLoading(prev => ({ ...prev, delete: false }));
     }
