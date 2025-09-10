@@ -13,11 +13,31 @@ const {
   findNextSafePosition
 } = require('../utils/positionManager');
 
-// Bütün kayıtları getiren fonksiyon (READ ALL)
+// Bütün kayıtları getiren fonksiyon (READ ALL) - with pagination support
 const getAllMerkmalstexte = async (req, res, next) => {
   try {
     const pool = await poolPromise;
-    const result = await pool.request().query('SELECT * FROM merkmalstexte');
+    
+    // Extract pagination parameters with defaults and validation
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.max(1, Math.min(parseInt(req.query.limit) || 50, 1000)); // Max 1000 per page
+    const offset = (page - 1) * limit;
+    
+    // Get total count for pagination metadata
+    const countResult = await pool.request().query('SELECT COUNT(*) as total FROM merkmalstexte');
+    const totalCount = countResult.recordset[0].total;
+    const totalPages = Math.ceil(totalCount / limit);
+    
+    // Get paginated records with proper ordering
+    const result = await pool.request()
+      .input('offset', sql.Int, offset)
+      .input('limit', sql.Int, limit)
+      .query(`
+        SELECT * FROM merkmalstexte 
+        ORDER BY merkmalsposition, identnr, merkmal
+        OFFSET @offset ROWS 
+        FETCH NEXT @limit ROWS ONLY
+      `);
     
     // Frontend için alanları eşleştirelim
     const recordsWithNewFields = result.recordset.map(record => ({
@@ -28,7 +48,20 @@ const getAllMerkmalstexte = async (req, res, next) => {
       fertigungsliste: record.fertigungsliste
     }));
     
-    res.status(200).json(formatSuccess(recordsWithNewFields, 'Merkmalstexte erfolgreich abgerufen'));
+    // Return data with pagination metadata
+    const responseData = {
+      data: recordsWithNewFields,
+      pagination: {
+        currentPage: page,
+        totalPages: totalPages,
+        totalCount: totalCount,
+        pageSize: limit,
+        hasNextPage: page < totalPages,
+        hasPreviousPage: page > 1
+      }
+    };
+    
+    res.status(200).json(formatSuccess(responseData, `Seite ${page} von ${totalPages} erfolgreich abgerufen`));
   } catch (err) {
     next(err);
   }
@@ -348,15 +381,19 @@ const bulkUpdateMerkmalstextePositions = async (req, res, next) => {
 
 // Advanced filtering endpoint - Legacy merkmalstexte.jsp functionality
 const getFilteredMerkmalstexte = async (req, res, next) => {
-  const { identnr, merkmal, auspraegung, drucktext, sondermerkmal, position, sonderAbt, fertigungsliste } = req.query;
+  const { identnr, merkmal, auspraegung, drucktext, sondermerkmal, position, sonderAbt, fertigungsliste, page, limit } = req.query;
   
   try {
     const pool = await poolPromise;
     const request = pool.request();
     
+    // Extract pagination parameters with defaults and validation
+    const currentPage = Math.max(1, parseInt(page) || 1);
+    const pageSize = Math.max(1, Math.min(parseInt(limit) || 50, 1000)); // Max 1000 per page
+    const offset = (currentPage - 1) * pageSize;
+    
     // Build dynamic WHERE clause
     let whereConditions = [];
-    let queryParams = [];
     
     if (identnr) {
       whereConditions.push('identnr LIKE @identnr');
@@ -398,12 +435,26 @@ const getFilteredMerkmalstexte = async (req, res, next) => {
       request.input('fertigungsliste', sql.Int, parseInt(fertigungsliste));
     }
     
-    // Build final query
-    let query = 'SELECT * FROM merkmalstexte';
-    if (whereConditions.length > 0) {
-      query += ' WHERE ' + whereConditions.join(' AND ');
-    }
-    query += ' ORDER BY merkmalsposition, identnr, merkmal';
+    const whereClause = whereConditions.length > 0 ? ' WHERE ' + whereConditions.join(' AND ') : '';
+    
+    // Get total count for pagination metadata
+    const countQuery = `SELECT COUNT(*) as total FROM merkmalstexte${whereClause}`;
+    const countResult = await request.query(countQuery);
+    const totalCount = countResult.recordset[0].total;
+    const totalPages = Math.ceil(totalCount / pageSize);
+    
+    // Add pagination parameters to the request
+    request.input('offset', sql.Int, offset);
+    request.input('pageSize', sql.Int, pageSize);
+    
+    // Build paginated query
+    const query = `
+      SELECT * FROM merkmalstexte
+      ${whereClause}
+      ORDER BY merkmalsposition, identnr, merkmal
+      OFFSET @offset ROWS 
+      FETCH NEXT @pageSize ROWS ONLY
+    `;
     
     const result = await request.query(query);
     
@@ -415,7 +466,20 @@ const getFilteredMerkmalstexte = async (req, res, next) => {
       fertigungsliste: record.fertigungsliste
     }));
     
-    res.status(200).json(formatSuccess(recordsWithMappedFields, `${recordsWithMappedFields.length} gefilterte Datensätze gefunden`));
+    // Return data with pagination metadata
+    const responseData = {
+      data: recordsWithMappedFields,
+      pagination: {
+        currentPage: currentPage,
+        totalPages: totalPages,
+        totalCount: totalCount,
+        pageSize: pageSize,
+        hasNextPage: currentPage < totalPages,
+        hasPreviousPage: currentPage > 1
+      }
+    };
+    
+    res.status(200).json(formatSuccess(responseData, `Seite ${currentPage} von ${totalPages} (${totalCount} gefilterte Datensätze)`));
   } catch (err) {
     next(err);
   }

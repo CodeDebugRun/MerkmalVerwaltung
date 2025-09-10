@@ -1,7 +1,7 @@
 const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
-const rateLimit = require('express-rate-limit');
+// const rateLimit = require('express-rate-limit'); // DEAKTIVIERT für Entwicklung
 const { poolPromise } = require('./db');
 const errorHandler = require('./middleware/errorHandler');
 const { formatSuccess, formatError } = require('./utils/responseFormatter');
@@ -12,15 +12,16 @@ const app = express();
 app.use(helmet());
 app.use(cors());
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 1 * 60 * 1000,
-  max: 50,
-  message: formatError('Zu viele Anfragen, bitte warten Sie.'),
-  standardHeaders: true,
-  legacyHeaders: false
-});
-app.use(limiter);
+// Rate limiting (KOMPLETT DEAKTIVIERT für Entwicklung)
+console.log('⚠️  Rate limiting komplett deaktiviert für Entwicklung');
+// const limiter = rateLimit({
+//   windowMs: 1 * 60 * 1000,
+//   max: 100,
+//   message: formatError('Zu viele Anfragen, bitte warten Sie.'),
+//   standardHeaders: true,
+//   legacyHeaders: false
+// });
+// app.use(limiter);
 
 // Database health check middleware
 app.use('/api', connectionManager.healthCheckMiddleware());

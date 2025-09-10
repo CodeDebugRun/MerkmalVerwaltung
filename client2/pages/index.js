@@ -1,11 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import axios from 'axios';
 import Head from 'next/head';
+import { usePagination } from '../hooks/usePagination';
+import Pagination from '../components/Pagination';
 
 export default function Home() {
-  const [merkmalstexte, setMerkmalstexte] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [operationLoading, setOperationLoading] = useState({
@@ -23,23 +22,44 @@ export default function Home() {
     sonderAbt: '0',
     fertigungsliste: '0'
   });
-  const [searchTerm, setSearchTerm] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [filterData, setFilterData] = useState({
     identnr: '',
     merkmal: '',
     auspraegung: '',
+    drucktext: '',
+    sondermerkmal: '',
     position: '',
     sonderAbt: '',
     fertigungsliste: ''
   });
 
-  // API endpoint
-  const API_BASE = '/api/merkmalstexte';
+  // Pagination Hook verwenden
+  const {
+    data: merkmalstexte,
+    pagination,
+    loading,
+    error,
+    goToPage,
+    refresh,
+    search,
+    isEmpty,
+    hasData
+  } = usePagination('/merkmalstexte', 50);
 
-  // Utility function to handle API errors
+  // API Base URL
+  const API_BASE = 'http://localhost:3001/api/merkmalstexte';
+
+  // Erfolgsnachricht anzeigen (mit automatischem Ausblenden)
+  const showSuccess = (message) => {
+    setSuccessMessage(message);
+    setTimeout(() => setSuccessMessage(''), 3000);
+  };
+
+  // Fehlerbehandlung
   const handleApiError = (err, defaultMessage) => {
+    console.error('API Fehler:', err);
     let errorMessage = defaultMessage;
     
     if (err.response?.data) {
@@ -53,77 +73,10 @@ export default function Home() {
       errorMessage = `Netzwerkfehler: ${err.message}`;
     }
     
-    setError(errorMessage);
-    setTimeout(() => setError(null), 5000); // Auto-clear after 5 seconds
+    showSuccess(`❌ ${errorMessage}`);
   };
 
-  // Show success message with auto-clear
-  const showSuccess = (message) => {
-    setSuccessMessage(message);
-    setTimeout(() => setSuccessMessage(''), 3000);
-  };
-
-  // Fetch all records
-  useEffect(() => {
-    fetchMerkmalstexte();
-  }, []);
-
-  const fetchMerkmalstexte = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await axios.get(API_BASE);
-      
-      // Handle new API response format
-      if (response.data.success && response.data.data) {
-        setMerkmalstexte(response.data.data);
-      } else {
-        // Fallback for old format
-        setMerkmalstexte(Array.isArray(response.data) ? response.data : []);
-      }
-    } catch (err) {
-      handleApiError(err, 'Fehler beim Laden der Daten');
-      setMerkmalstexte([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Filter function with multiple criteria
-  const fetchFilteredData = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      // Build query params from filter data
-      const queryParams = new URLSearchParams();
-      Object.entries(filterData).forEach(([key, value]) => {
-        if (value && value.toString().trim()) {
-          queryParams.append(key, value.toString().trim());
-        }
-      });
-      
-      const endpoint = queryParams.toString() 
-        ? `${API_BASE}/filter?${queryParams.toString()}`
-        : API_BASE;
-        
-      const response = await axios.get(endpoint);
-      
-      // Handle API response format
-      if (response.data.success && response.data.data) {
-        setMerkmalstexte(response.data.data);
-        showSuccess(`${response.data.data.length} Datensätze gefunden`);
-      } else {
-        setMerkmalstexte(Array.isArray(response.data) ? response.data : []);
-      }
-    } catch (err) {
-      handleApiError(err, 'Fehler beim Filtern der Daten');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Handle filter input changes
+  // Filter-Eingabe-Änderungen verarbeiten
   const handleFilterChange = (field, value) => {
     setFilterData(prev => ({
       ...prev,
@@ -131,104 +84,38 @@ export default function Home() {
     }));
   };
 
-  // Clear all filters
+  // Suche durchführen
+  const handleSearch = () => {
+    const activeFilters = Object.keys(filterData).reduce((acc, key) => {
+      if (filterData[key] && filterData[key].toString().trim() !== '') {
+        acc[key] = filterData[key].toString().trim();
+      }
+      return acc;
+    }, {});
+    
+    search(activeFilters);
+    if (Object.keys(activeFilters).length > 0) {
+      showSuccess('✅ Filter angewendet');
+    }
+  };
+
+  // Alle Filter löschen
   const clearFilters = () => {
     setFilterData({
       identnr: '',
       merkmal: '',
       auspraegung: '',
+      drucktext: '',
+      sondermerkmal: '',
       position: '',
       sonderAbt: '',
       fertigungsliste: ''
     });
-    fetchMerkmalstexte(); // Reload all data
+    search({}); // Alle Daten neu laden
+    showSuccess('✅ Filter gelöscht');
   };
 
-  // Apply filters
-  const applyFilters = () => {
-    fetchFilteredData();
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    // Form validation
-    if (!formData.identnr || !formData.merkmal || !formData.auspraegung || !formData.drucktext) {
-      setError('Bitte füllen Sie alle Pflichtfelder aus');
-      return;
-    }
-    
-    const isUpdate = !!editingItem;
-    const operationType = isUpdate ? 'update' : 'create';
-    
-    try {
-      setOperationLoading(prev => ({ ...prev, [operationType]: true }));
-      setError(null);
-      
-      let response;
-      if (isUpdate) {
-        response = await axios.put(`${API_BASE}/${editingItem.id}`, formData);
-      } else {
-        response = await axios.post(API_BASE, formData);
-      }
-      
-      // Handle success message from API
-      if (response.data.success && response.data.message) {
-        showSuccess(response.data.message);
-      } else {
-        showSuccess(isUpdate ? 'Datensatz erfolgreich aktualisiert' : 'Datensatz erfolgreich erstellt');
-      }
-      
-      await fetchMerkmalstexte();
-      resetForm();
-    } catch (err) {
-      handleApiError(err, isUpdate ? 'Fehler beim Aktualisieren' : 'Fehler beim Erstellen');
-    } finally {
-      setOperationLoading(prev => ({ ...prev, [operationType]: false }));
-    }
-  };
-
-  const handleDelete = async (id) => {
-    if (!window.confirm('Sind Sie sicher, dass Sie diesen Datensatz löschen möchten?')) {
-      return;
-    }
-    
-    try {
-      setOperationLoading(prev => ({ ...prev, delete: true }));
-      setError(null);
-      
-      const response = await axios.delete(`${API_BASE}/${id}`);
-      
-      if (response.data.success && response.data.message) {
-        showSuccess(response.data.message);
-      } else {
-        showSuccess('Datensatz erfolgreich gelöscht');
-      }
-      
-      await fetchMerkmalstexte();
-    } catch (err) {
-      handleApiError(err, 'Fehler beim Löschen des Datensatzes');
-    } finally {
-      setOperationLoading(prev => ({ ...prev, delete: false }));
-    }
-  };
-
-  const handleEdit = (item) => {
-    setEditingItem(item);
-    setFormData({
-      identnr: item.identnr || '',
-      merkmal: item.merkmal || '',
-      auspraegung: item.auspraegung || '',
-      drucktext: item.drucktext || '',
-      sondermerkmal: item.sondermerkmal || '',
-      position: item.position || '',
-      sonderAbt: item.sonderAbt ? item.sonderAbt.toString() : '0',
-      fertigungsliste: (item.fertigungsliste && item.fertigungsliste !== 0) ? '1' : '0'
-    });
-    setShowForm(true);
-    setError(null);
-  };
-
+  // Formular zurücksetzen
   const resetForm = () => {
     setFormData({
       identnr: '',
@@ -241,104 +128,160 @@ export default function Home() {
       fertigungsliste: '0'
     });
     setEditingItem(null);
-    setShowForm(false);
-    setError(null);
   };
 
-  const handleInputChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
-  };
-
-  // Color mapping function for Sonder Abt (maka) field
-  const getSonderAbtColor = (makaValue) => {
-    if (!makaValue || makaValue === 0) return '';
+  // Formular absenden
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     
-    switch (parseInt(makaValue)) {
-      case 1: return 'schwarz';
-      case 2: return 'blau';
-      case 3: return 'rot';
-      case 4: return 'orange';
-      case 5: return 'grün';
-      case 6: return 'weiss';
-      case 7: return 'gelb';
-      default: return '';
+    // Formular-Validierung
+    if (!formData.identnr || !formData.merkmal || !formData.auspraegung || !formData.drucktext) {
+      showSuccess('❌ Bitte füllen Sie alle Pflichtfelder aus');
+      return;
+    }
+    
+    const isUpdate = !!editingItem;
+    const operationType = isUpdate ? 'update' : 'create';
+    
+    try {
+      setOperationLoading(prev => ({ ...prev, [operationType]: true }));
+      
+      let response;
+      if (isUpdate) {
+        response = await axios.put(`${API_BASE}/${editingItem.id}`, formData);
+      } else {
+        response = await axios.post(API_BASE, formData);
+      }
+      
+      // Erfolgsmeldung vom API
+      if (response.data.success) {
+        showSuccess(`✅ ${response.data.message || (isUpdate ? 'Datensatz aktualisiert' : 'Datensatz erstellt')}`);
+        resetForm();
+        setShowForm(false);
+        refresh(); // Daten neu laden
+      } else {
+        throw new Error(response.data.message || 'Unbekannter Fehler');
+      }
+    } catch (err) {
+      handleApiError(err, isUpdate ? 'Fehler beim Aktualisieren' : 'Fehler beim Erstellen');
+    } finally {
+      setOperationLoading(prev => ({ ...prev, [operationType]: false }));
     }
   };
 
-  // Filter records based on search term
-  const filteredMerkmalstexte = merkmalstexte.filter(item => {
-    if (!searchTerm) return true;
-    const searchLower = searchTerm.toLowerCase();
-    return (
-      item.identnr?.toLowerCase().includes(searchLower) ||
-      item.merkmal?.toLowerCase().includes(searchLower) ||
-      item.auspraegung?.toLowerCase().includes(searchLower) ||
-      item.drucktext?.toLowerCase().includes(searchLower) ||
-      item.sondermerkmal?.toLowerCase().includes(searchLower) ||
-      item.position?.toString().includes(searchLower) ||
-      item.sonderAbt?.toString().includes(searchLower) ||
-      item.fertigungsliste?.toString().includes(searchLower) ||
-      item.id?.toString().includes(searchTerm)
-    );
-  });
+  // Datensatz bearbeiten
+  const handleEdit = (item) => {
+    setFormData({
+      identnr: item.identnr || '',
+      merkmal: item.merkmal || '',
+      auspraegung: item.auspraegung || '',
+      drucktext: item.drucktext || '',
+      sondermerkmal: item.sondermerkmal || '',
+      position: item.position || '',
+      sonderAbt: item.sonderAbt?.toString() || '0',
+      fertigungsliste: item.fertigungsliste?.toString() || '0'
+    });
+    setEditingItem(item);
+    setShowForm(true);
+  };
+
+  // Datensatz löschen
+  const handleDelete = async (id, identnr) => {
+    if (!window.confirm(`Möchten Sie den Datensatz "${identnr}" wirklich löschen?`)) {
+      return;
+    }
+    
+    try {
+      setOperationLoading(prev => ({ ...prev, delete: true }));
+      
+      const response = await axios.delete(`${API_BASE}/${id}`);
+      
+      if (response.data.success) {
+        showSuccess(`✅ ${response.data.message || 'Datensatz gelöscht'}`);
+        refresh(); // Daten neu laden
+      } else {
+        throw new Error(response.data.message || 'Unbekannter Fehler');
+      }
+    } catch (err) {
+      handleApiError(err, 'Fehler beim Löschen');
+    } finally {
+      setOperationLoading(prev => ({ ...prev, delete: false }));
+    }
+  };
+
+  // Formular-Input ändern
+  const handleInputChange = (field, value) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  // Sonder Abt. Renk adı gösterme fonksiyonu
+  const getSonderAbtDisplay = (sonderAbtValue) => {
+    if (!sonderAbtValue || sonderAbtValue === 0) {
+      return '-';
+    }
+    
+    const colorNames = {
+      1: 'schwarz',
+      2: 'blau',
+      3: 'rot',
+      4: 'orange',
+      5: 'grün',
+      6: 'weiss',
+      7: 'gelb'
+    };
+    
+    return colorNames[sonderAbtValue] || '-';
+  };
 
   return (
     <div className="App">
       <Head>
-        <title>LEBO Merkmalstexte Verwaltung</title>
-        <meta name="description" content="LEBO Merkmalstexte Verwaltungssystem" />
-        <link rel="icon" href="/favicon.ico" />
+        <title>Merkmalstexte Verwaltung - LEBO</title>
+        <meta name="description" content="LEBO Merkmalstexte Management System" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
 
       <header className="App-header">
-        <div className="header-left">
-          <h1>LEBO Merkmalstexte Verwaltung</h1>
-        </div>
-        <div className="header-center">
-          <div className="search-container">
-            <input
-              type="text"
-              placeholder="Suchen..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="search-input"
-            />
-            <div className="search-icon">🔍</div>
-          </div>
+        <div className="header-top">
+          <h1>📊 Merkmalstexte Verwaltung</h1>
         </div>
         <div className="header-buttons">
           <button 
             className="btn btn-primary" 
-            onClick={() => setShowForm(!showForm)}
-            disabled={operationLoading.create || operationLoading.update}
+            onClick={() => {
+              if (showForm) {
+                resetForm();
+              }
+              setShowForm(!showForm);
+            }}
+            disabled={loading || operationLoading.create || operationLoading.update}
           >
-            {showForm ? 'Abbrechen' : 'Neu hinzufügen'}
+            {showForm ? '❌ Abbrechen' : '➕ Neu hinzufügen'}
           </button>
           <button 
             className="btn btn-info" 
             onClick={() => setShowFilters(!showFilters)}
             disabled={loading}
           >
-            {showFilters ? 'Filter schließen' : '🔍 Filter'}
+            {showFilters ? '🔽 Filter ausblenden' : '🔍 Filter einblenden'}
           </button>
           <button 
             className="btn btn-secondary" 
-            onClick={fetchMerkmalstexte}
+            onClick={refresh}
             disabled={loading}
           >
-            {loading ? 'Lädt...' : 'Aktualisieren'}
+            {loading ? '⏳ Lädt...' : '🔄 Aktualisieren'}
           </button>
         </div>
       </header>
 
       <main className="App-main">
-        {/* Success Message */}
+        {/* Erfolgsnachricht */}
         {successMessage && (
           <div className="success-message" role="alert">
-            <span>✅</span>
             <span>{successMessage}</span>
             <button 
               onClick={() => setSuccessMessage('')}
@@ -350,305 +293,238 @@ export default function Home() {
           </div>
         )}
 
-        {/* Advanced Filter Panel */}
-        {showFilters && (
-          <div className="filter-panel">
-            <div className="filter-header">
-              <h3>🔍 Erweiterte Filter</h3>
-              <div className="filter-controls">
-                <button className="btn btn-sm btn-success" onClick={applyFilters}>
-                  Anwenden
-                </button>
-                <button className="btn btn-sm btn-secondary" onClick={clearFilters}>
-                  Zurücksetzen
-                </button>
-              </div>
-            </div>
-            
-            <div className="filter-grid">
-              {/* Text Inputs */}
-              <div className="filter-group">
-                <label>Identr:</label>
-                <input
-                  type="text"
-                  value={filterData.identnr}
-                  onChange={(e) => handleFilterChange('identnr', e.target.value)}
-                  placeholder="z.B. T0001"
-                  className="filter-input"
-                />
-              </div>
-              
-              <div className="filter-group">
-                <label>Merkmal:</label>
-                <input
-                  type="text"
-                  value={filterData.merkmal}
-                  onChange={(e) => handleFilterChange('merkmal', e.target.value)}
-                  placeholder="z.B. UNT_LACK_AS"
-                  className="filter-input"
-                />
-              </div>
-              
-              <div className="filter-group">
-                <label>Ausprägung:</label>
-                <input
-                  type="text"
-                  value={filterData.auspraegung}
-                  onChange={(e) => handleFilterChange('auspraegung', e.target.value)}
-                  placeholder="z.B. LFG"
-                  className="filter-input"
-                />
-              </div>
-              
-              <div className="filter-group">
-                <label>Position:</label>
-                <input
-                  type="number"
-                  value={filterData.position}
-                  onChange={(e) => handleFilterChange('position', e.target.value)}
-                  placeholder="z.B. 300"
-                  className="filter-input"
-                  min="1"
-                />
-              </div>
-              
-              {/* Sonder Abt Dropdown */}
-              <div className="filter-group">
-                <label>Sonder Abt.:</label>
-                <select
-                  value={filterData.sonderAbt}
-                  onChange={(e) => handleFilterChange('sonderAbt', e.target.value)}
-                  className="filter-input"
-                >
-                  <option value="">Alle</option>
-                  <option value="1">🖤 schwarz</option>
-                  <option value="2">💙 blau</option>
-                  <option value="3">❤️ rot</option>
-                  <option value="4">🧡 orange</option>
-                  <option value="5">💚 grün</option>
-                  <option value="6">🤍 weiss</option>
-                  <option value="7">💛 gelb</option>
-                </select>
-              </div>
-              
-              {/* Fertigungsliste Checkboxes */}
-              <div className="filter-group">
-                <label>Fertigungsliste:</label>
-                <div className="checkbox-filter">
-                  <label className="checkbox-option">
-                    <input
-                      type="radio"
-                      name="fertigungsliste-filter"
-                      value=""
-                      checked={filterData.fertigungsliste === ''}
-                      onChange={(e) => handleFilterChange('fertigungsliste', e.target.value)}
-                    />
-                    Alle
-                  </label>
-                  <label className="checkbox-option">
-                    <input
-                      type="radio"
-                      name="fertigungsliste-filter"
-                      value="1"
-                      checked={filterData.fertigungsliste === '1'}
-                      onChange={(e) => handleFilterChange('fertigungsliste', e.target.value)}
-                    />
-                    ✅ Ja
-                  </label>
-                  <label className="checkbox-option">
-                    <input
-                      type="radio"
-                      name="fertigungsliste-filter"
-                      value="0"
-                      checked={filterData.fertigungsliste === '0'}
-                      onChange={(e) => handleFilterChange('fertigungsliste', e.target.value)}
-                    />
-                    ❌ Nein
-                  </label>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Error Message */}
+        {/* Fehlernachricht */}
         {error && (
           <div className="error-message" role="alert">
-            <span>❌</span>
-            <span>{error}</span>
+            <span>❌ {error}</span>
             <button 
-              onClick={() => setError(null)}
+              onClick={() => window.location.reload()}
               className="close-btn"
-              aria-label="Fehlermeldung schließen"
+              aria-label="Seite neu laden"
             >
-              ×
+              🔄
             </button>
           </div>
         )}
 
-        {/* Form */}
+        {/* Erweiterte Filter */}
+        {showFilters && (
+          <section className="filter-section">
+            <h3>🔍 Erweiterte Filter</h3>
+            <div className="filter-grid">
+              <input
+                type="text"
+                placeholder="Ident-Nr."
+                value={filterData.identnr}
+                onChange={(e) => handleFilterChange('identnr', e.target.value)}
+                className="filter-input"
+              />
+              <input
+                type="text"
+                placeholder="Merkmal"
+                value={filterData.merkmal}
+                onChange={(e) => handleFilterChange('merkmal', e.target.value)}
+                className="filter-input"
+              />
+              <input
+                type="text"
+                placeholder="Ausprägung"
+                value={filterData.auspraegung}
+                onChange={(e) => handleFilterChange('auspraegung', e.target.value)}
+                className="filter-input"
+              />
+              <input
+                type="text"
+                placeholder="Drucktext"
+                value={filterData.drucktext}
+                onChange={(e) => handleFilterChange('drucktext', e.target.value)}
+                className="filter-input"
+              />
+              <input
+                type="text"
+                placeholder="Sondermerkmal"
+                value={filterData.sondermerkmal}
+                onChange={(e) => handleFilterChange('sondermerkmal', e.target.value)}
+                className="filter-input"
+              />
+              <input
+                type="number"
+                placeholder="Position"
+                value={filterData.position}
+                onChange={(e) => handleFilterChange('position', e.target.value)}
+                className="filter-input"
+              />
+            </div>
+            <div className="filter-buttons">
+              <button 
+                className="btn btn-primary" 
+                onClick={handleSearch}
+                disabled={loading}
+              >
+                🔍 Suchen
+              </button>
+              <button 
+                className="btn btn-secondary" 
+                onClick={clearFilters}
+                disabled={loading}
+              >
+                🗑️ Filter löschen
+              </button>
+            </div>
+          </section>
+        )}
+
+        {/* Formular */}
         {showForm && (
-          <div className="form-container">
-            <h2>{editingItem ? 'Datensatz bearbeiten' : 'Neuen Datensatz hinzufügen'}</h2>
-            <form onSubmit={handleSubmit}>
+          <section className="form-section">
+            <h3>{editingItem ? '✏️ Datensatz bearbeiten' : '➕ Neuen Datensatz hinzufügen'}</h3>
+            <form onSubmit={handleSubmit} className="data-form">
               <div className="form-row">
-                <div className="form-group">
-                  <label>Ident Nr: <span className="required">*</span></label>
-                  <input
-                    type="text"
-                    name="identnr"
-                    value={formData.identnr}
-                    onChange={handleInputChange}
-                    required
-                    maxLength={50}
-                    disabled={operationLoading.create || operationLoading.update}
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Merkmal: <span className="required">*</span></label>
-                  <input
-                    type="text"
-                    name="merkmal"
-                    value={formData.merkmal}
-                    onChange={handleInputChange}
-                    required
-                    maxLength={100}
-                    disabled={operationLoading.create || operationLoading.update}
-                  />
-                </div>
+                <input
+                  type="text"
+                  placeholder="Ident-Nr. *"
+                  value={formData.identnr}
+                  onChange={(e) => handleInputChange('identnr', e.target.value)}
+                  required
+                  className="form-input"
+                />
+                <input
+                  type="text"
+                  placeholder="Merkmal *"
+                  value={formData.merkmal}
+                  onChange={(e) => handleInputChange('merkmal', e.target.value)}
+                  required
+                  className="form-input"
+                />
               </div>
-              
               <div className="form-row">
-                <div className="form-group">
-                  <label>Ausprägung: <span className="required">*</span></label>
-                  <input
-                    type="text"
-                    name="auspraegung"
-                    value={formData.auspraegung}
-                    onChange={handleInputChange}
-                    required
-                    maxLength={100}
-                    disabled={operationLoading.create || operationLoading.update}
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Drucktext: <span className="required">*</span></label>
-                  <input
-                    type="text"
-                    name="drucktext"
-                    value={formData.drucktext}
-                    onChange={handleInputChange}
-                    required
-                    maxLength={255}
-                    disabled={operationLoading.create || operationLoading.update}
-                  />
-                </div>
+                <input
+                  type="text"
+                  placeholder="Ausprägung *"
+                  value={formData.auspraegung}
+                  onChange={(e) => handleInputChange('auspraegung', e.target.value)}
+                  required
+                  className="form-input"
+                />
+                <input
+                  type="text"
+                  placeholder="Drucktext *"
+                  value={formData.drucktext}
+                  onChange={(e) => handleInputChange('drucktext', e.target.value)}
+                  required
+                  className="form-input"
+                />
               </div>
-              
               <div className="form-row">
-                <div className="form-group">
-                  <label>Sondermerkmal:</label>
-                  <input
-                    type="text"
-                    name="sondermerkmal"
-                    value={formData.sondermerkmal}
-                    onChange={handleInputChange}
-                    maxLength={100}
-                    disabled={operationLoading.create || operationLoading.update}
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Position:</label>
-                  <input
-                    type="number"
-                    name="position"
-                    value={formData.position}
-                    onChange={handleInputChange}
-                    min="0"
-                    disabled={operationLoading.create || operationLoading.update}
-                  />
-                </div>
+                <input
+                  type="text"
+                  placeholder="Sondermerkmal"
+                  value={formData.sondermerkmal}
+                  onChange={(e) => handleInputChange('sondermerkmal', e.target.value)}
+                  className="form-input"
+                />
+                <input
+                  type="number"
+                  placeholder="Position"
+                  value={formData.position}
+                  onChange={(e) => handleInputChange('position', e.target.value)}
+                  className="form-input"
+                />
               </div>
-              
               <div className="form-row">
-                <div className="form-group">
-                  <label htmlFor="sonderAbt">Sonder Abt.</label>
-                  <select
-                    id="sonderAbt"
-                    name="sonderAbt"
-                    value={formData.sonderAbt}
-                    onChange={handleInputChange}
-                    disabled={operationLoading.create || operationLoading.update}
-                  >
-                    <option value="0">Keine Auswahl</option>
-                    <option value="1">Schwarz</option>
-                    <option value="2">Blau</option>
-                    <option value="3">Rot</option>
-                    <option value="4">Orange</option>
-                    <option value="5">Grün</option>
-                    <option value="6">Weiss</option>
-                    <option value="7">Gelb</option>
-                  </select>
-                </div>
-                <div className="form-group checkbox-group">
-                  <label className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      name="fertigungsliste"
-                      checked={formData.fertigungsliste === '1' || formData.fertigungsliste === 1}
-                      onChange={(e) => setFormData({
-                        ...formData,
-                        fertigungsliste: e.target.checked ? '1' : '0'
-                      })}
-                      disabled={operationLoading.create || operationLoading.update}
-                    />
-                    <span className="checkmark"></span>
-                    Fertigungsliste
-                  </label>
-                </div>
+                <select
+                  value={formData.sonderAbt}
+                  onChange={(e) => handleInputChange('sonderAbt', e.target.value)}
+                  className="form-input"
+                >
+                  <option value="0">Sonder Abt.: Keine Auswahl</option>
+                  <option value="1">1 - schwarz</option>
+                  <option value="2">2 - blau</option>
+                  <option value="3">3 - rot</option>
+                  <option value="4">4 - orange</option>
+                  <option value="5">5 - grün</option>
+                  <option value="6">6 - weiss</option>
+                  <option value="7">7 - gelb</option>
+                </select>
+                <select
+                  value={formData.fertigungsliste}
+                  onChange={(e) => handleInputChange('fertigungsliste', e.target.value)}
+                  className="form-input"
+                >
+                  <option value="0">Fertigungsliste: Nein</option>
+                  <option value="1">Fertigungsliste: Ja</option>
+                </select>
               </div>
-              
               <div className="form-buttons">
                 <button 
                   type="submit" 
-                  className="btn btn-primary"
+                  className="btn btn-success"
                   disabled={operationLoading.create || operationLoading.update}
                 >
-                  {operationLoading.create || operationLoading.update ? 
-                    'Wird gespeichert...' : 
-                    (editingItem ? 'Aktualisieren' : 'Erstellen')
+                  {operationLoading.create || operationLoading.update 
+                    ? '⏳ Verarbeitung...' 
+                    : (editingItem ? '💾 Aktualisieren' : '➕ Hinzufügen')
                   }
                 </button>
                 <button 
                   type="button" 
-                  className="btn btn-secondary" 
-                  onClick={resetForm}
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    resetForm();
+                    setShowForm(false);
+                  }}
                   disabled={operationLoading.create || operationLoading.update}
                 >
-                  Abbrechen
+                  ❌ Abbrechen
                 </button>
               </div>
             </form>
-          </div>
+          </section>
         )}
 
-        {/* Data Table */}
-        <div className="data-section">
-          <h2>
-            Datensätze ({filteredMerkmalstexte.length} 
-            {searchTerm && ` von ${merkmalstexte.length} gefiltert`})
-          </h2>
-          {loading ? (
-            <div className="loading">
-              <div className="loading-spinner"></div>
-              <span>Daten werden geladen...</span>
+        {/* Datenübersicht */}
+        <section className="data-section">
+          <div className="data-header">
+            <h3>📋 Datensätze</h3>
+            {!loading && (
+              <p className="data-info">
+                {hasData 
+                  ? `Seite ${pagination.currentPage} von ${pagination.totalPages} (${pagination.totalCount} Datensätze insgesamt)`
+                  : 'Keine Daten verfügbar'
+                }
+              </p>
+            )}
+          </div>
+
+          {/* Ladebildschirm */}
+          {loading && (
+            <div className="loading-container">
+              <div className="loading-spinner">⏳</div>
+              <p>Daten werden geladen...</p>
             </div>
-          ) : (
+          )}
+
+          {/* Keine Daten */}
+          {isEmpty && !loading && (
+            <div className="empty-state">
+              <div className="empty-icon">📭</div>
+              <h4>Keine Datensätze gefunden</h4>
+              <p>Es wurden keine Datensätze mit den aktuellen Filtern gefunden.</p>
+              {Object.values(filterData).some(v => v) && (
+                <button className="btn btn-primary" onClick={clearFilters}>
+                  🗑️ Filter zurücksetzen
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Datentabelle */}
+          {hasData && !loading && (
             <div className="table-container">
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Identnr</th>
+                    <th>Ident-Nr.</th>
                     <th>Merkmal</th>
                     <th>Ausprägung</th>
                     <th>Drucktext</th>
@@ -660,54 +536,343 @@ export default function Home() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredMerkmalstexte.slice(0, 50).map((item) => (
+                  {merkmalstexte.map((item) => (
                     <tr key={item.id}>
                       <td>{item.identnr}</td>
                       <td>{item.merkmal}</td>
                       <td>{item.auspraegung}</td>
-                      <td>{item.drucktext}</td>
+                      <td title={item.drucktext}>
+                        {item.drucktext?.length > 30 
+                          ? `${item.drucktext.substring(0, 30)}...` 
+                          : item.drucktext
+                        }
+                      </td>
                       <td>{item.sondermerkmal || '-'}</td>
                       <td>{item.position || '-'}</td>
-                      <td className="checkbox-cell">{getSonderAbtColor(item.sonderAbt) || '❌'}</td>
-                      <td className="checkbox-cell">{item.fertigungsliste && item.fertigungsliste !== 0 ? '✅' : '❌'}</td>
-                      <td className="actions">
-                        <button 
-                          className="btn btn-icon btn-edit" 
-                          onClick={() => handleEdit(item)}
-                          disabled={operationLoading.create || operationLoading.update || operationLoading.delete}
-                          title="Bearbeiten"
-                        >
-                          ✏️
-                        </button>
-                        <button 
-                          className="btn btn-icon btn-delete" 
-                          onClick={() => handleDelete(item.id)}
-                          disabled={operationLoading.create || operationLoading.update || operationLoading.delete}
-                          title={operationLoading.delete ? 'Löscht...' : 'Löschen'}
-                        >
-                          {operationLoading.delete ? '⏳' : '🗑️'}
-                        </button>
+                      <td>{getSonderAbtDisplay(item.sonderAbt || item.maka)}</td>
+                      <td>{item.fertigungsliste === 1 ? '✅' : '❌'}</td>
+                      <td>
+                        <div className="action-buttons">
+                          <button
+                            className="btn-small btn-edit"
+                            onClick={() => handleEdit(item)}
+                            disabled={operationLoading.update}
+                            title="Bearbeiten"
+                          >
+                            ✏️
+                          </button>
+                          <button
+                            className="btn-small btn-delete"
+                            onClick={() => handleDelete(item.id, item.identnr)}
+                            disabled={operationLoading.delete}
+                            title="Löschen"
+                          >
+                            🗑️
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-              {filteredMerkmalstexte.length === 0 && searchTerm && (
-                <p className="table-note">Keine Ergebnisse für "{searchTerm}" gefunden.</p>
-              )}
-              {filteredMerkmalstexte.length === 0 && !searchTerm && !loading && (
-                <p className="table-note">Keine Datensätze verfügbar.</p>
-              )}
-              {filteredMerkmalstexte.length > 50 && (
-                <p className="table-note">
-                  Die ersten 50 Datensätze von {filteredMerkmalstexte.length} werden angezeigt
-                  {searchTerm && ` (gefiltert von ${merkmalstexte.length} Gesamtdatensätzen)`}
-                </p>
-              )}
             </div>
           )}
-        </div>
+
+          {/* Pagination */}
+          {hasData && !loading && (
+            <Pagination
+              currentPage={pagination.currentPage}
+              totalCount={pagination.totalCount}
+              pageSize={pagination.pageSize}
+              onPageChange={goToPage}
+            />
+          )}
+        </section>
       </main>
+
+      <style jsx>{`
+        .App {
+          text-align: center;
+          background-color: #f5f5f5;
+          min-height: 100vh;
+        }
+
+        .App-header {
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          padding: 20px;
+          color: white;
+          box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .header-top {
+          margin-bottom: 20px;
+        }
+
+        .header-top h1 {
+          margin: 0;
+          font-size: 2.2em;
+          font-weight: 600;
+        }
+
+        .header-buttons {
+          display: flex;
+          gap: 15px;
+          justify-content: center;
+          flex-wrap: wrap;
+        }
+
+        .App-main {
+          max-width: 1400px;
+          margin: 0 auto;
+          padding: 30px 20px;
+        }
+
+        .btn {
+          padding: 12px 20px;
+          border: none;
+          border-radius: 8px;
+          cursor: pointer;
+          font-weight: 600;
+          transition: all 0.3s ease;
+          font-size: 14px;
+        }
+
+        .btn:hover:not(:disabled) {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        .btn:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+          transform: none;
+        }
+
+        .btn-primary {
+          background: #007bff;
+          color: white;
+        }
+
+        .btn-secondary {
+          background: #6c757d;
+          color: white;
+        }
+
+        .btn-info {
+          background: #17a2b8;
+          color: white;
+        }
+
+        .btn-success {
+          background: #28a745;
+          color: white;
+        }
+
+        .btn-small {
+          padding: 8px 12px;
+          font-size: 12px;
+          border: none;
+          border-radius: 4px;
+          cursor: pointer;
+          margin: 2px;
+        }
+
+        .btn-edit {
+          background: #ffc107;
+          color: #212529;
+        }
+
+        .btn-delete {
+          background: #dc3545;
+          color: white;
+        }
+
+        .success-message, .error-message {
+          background: #d4edda;
+          border: 1px solid #c3e6cb;
+          color: #155724;
+          padding: 15px;
+          border-radius: 8px;
+          margin-bottom: 20px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+
+        .error-message {
+          background: #f8d7da;
+          border-color: #f5c6cb;
+          color: #721c24;
+        }
+
+        .close-btn {
+          background: none;
+          border: none;
+          font-size: 20px;
+          cursor: pointer;
+          padding: 0 5px;
+          margin-left: 10px;
+        }
+
+        .filter-section, .form-section, .data-section {
+          background: white;
+          border-radius: 12px;
+          padding: 25px;
+          margin-bottom: 25px;
+          box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+
+        .filter-section h3, .form-section h3, .data-section h3 {
+          margin-top: 0;
+          color: #333;
+          font-size: 1.4em;
+        }
+
+        .filter-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+          gap: 15px;
+          margin-bottom: 20px;
+        }
+
+        .filter-input, .form-input {
+          padding: 12px;
+          border: 2px solid #e9ecef;
+          border-radius: 8px;
+          font-size: 14px;
+          transition: border-color 0.3s ease;
+        }
+
+        .filter-input:focus, .form-input:focus {
+          outline: none;
+          border-color: #007bff;
+          box-shadow: 0 0 0 3px rgba(0,123,255,0.1);
+        }
+
+        .filter-buttons {
+          display: flex;
+          gap: 15px;
+          justify-content: center;
+        }
+
+        .data-form {
+          max-width: 800px;
+          margin: 0 auto;
+        }
+
+        .form-row {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 15px;
+          margin-bottom: 15px;
+        }
+
+        .form-buttons {
+          display: flex;
+          gap: 15px;
+          justify-content: center;
+          margin-top: 25px;
+        }
+
+        .data-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 20px;
+        }
+
+        .data-info {
+          color: #6c757d;
+          margin: 0;
+          font-size: 14px;
+        }
+
+        .loading-container {
+          text-align: center;
+          padding: 60px 20px;
+          color: #6c757d;
+        }
+
+        .loading-spinner {
+          font-size: 3em;
+          margin-bottom: 15px;
+          animation: spin 2s linear infinite;
+        }
+
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+
+        .empty-state {
+          text-align: center;
+          padding: 60px 20px;
+          color: #6c757d;
+        }
+
+        .empty-icon {
+          font-size: 4em;
+          margin-bottom: 20px;
+        }
+
+        .table-container {
+          overflow-x: auto;
+          border-radius: 8px;
+          border: 1px solid #dee2e6;
+        }
+
+        .data-table {
+          width: 100%;
+          border-collapse: collapse;
+          background: white;
+        }
+
+        .data-table th {
+          background: #f8f9fa;
+          padding: 15px 10px;
+          text-align: left;
+          font-weight: 600;
+          color: #495057;
+          border-bottom: 2px solid #dee2e6;
+        }
+
+        .data-table td {
+          padding: 15px 10px;
+          border-bottom: 1px solid #dee2e6;
+          vertical-align: middle;
+        }
+
+        .data-table tr:hover {
+          background: #f8f9fa;
+        }
+
+        .action-buttons {
+          display: flex;
+          gap: 5px;
+          justify-content: center;
+        }
+
+        @media (max-width: 768px) {
+          .header-buttons {
+            flex-direction: column;
+            align-items: center;
+          }
+          
+          .form-row {
+            grid-template-columns: 1fr;
+          }
+          
+          .filter-grid {
+            grid-template-columns: 1fr;
+          }
+          
+          .data-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 10px;
+          }
+        }
+      `}</style>
     </div>
   );
 }

@@ -1,0 +1,129 @@
+import { useState, useEffect, useCallback, useRef } from 'react';
+import axios from 'axios';
+
+const API_BASE_URL = 'http://localhost:3001/api';
+
+export const usePagination = (endpoint = '/merkmalstexte', initialPageSize = 50, filters = {}) => {
+  const [data, setData] = useState([]);
+  const [pagination, setPagination] = useState({
+    currentPage: 1,
+    totalPages: 1,
+    totalCount: 0,
+    pageSize: initialPageSize,
+    hasNextPage: false,
+    hasPreviousPage: false
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const fetchData = useCallback(async (page = 1, pageSize = initialPageSize, customFilters = {}) => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const params = {
+        page: Math.max(1, page),
+        limit: Math.max(1, Math.min(pageSize, 1000)), // Backend has max 1000 limit
+        ...filters,
+        ...customFilters
+      };
+      
+      // Remove empty filter values
+      Object.keys(params).forEach(key => {
+        if (params[key] === '' || params[key] === null || params[key] === undefined) {
+          delete params[key];
+        }
+      });
+
+      const response = await axios.get(`${API_BASE_URL}${endpoint}`, { params });
+      
+      if (response.data && response.data.success) {
+        const { data: responseData, pagination: paginationData } = response.data.data;
+        
+        setData(responseData || []);
+        setPagination({
+          currentPage: paginationData?.currentPage || 1,
+          totalPages: paginationData?.totalPages || 1,
+          totalCount: paginationData?.totalCount || 0,
+          pageSize: paginationData?.pageSize || initialPageSize,
+          hasNextPage: paginationData?.hasNextPage || false,
+          hasPreviousPage: paginationData?.hasPreviousPage || false
+        });
+      } else {
+        throw new Error(response.data?.message || 'Unknown error occurred');
+      }
+    } catch (err) {
+      console.error('Error fetching paginated data:', err);
+      setError(err.response?.data?.message || err.message || 'Failed to fetch data');
+      setData([]);
+      setPagination({
+        currentPage: 1,
+        totalPages: 1,
+        totalCount: 0,
+        pageSize: initialPageSize,
+        hasNextPage: false,
+        hasPreviousPage: false
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [endpoint, initialPageSize]); // Remove filters from dependencies to prevent infinite loop
+
+  const goToPage = useCallback((page) => {
+    const safePage = Math.max(1, Math.min(page, pagination.totalPages));
+    fetchData(safePage, pagination.pageSize);
+  }, [fetchData]);
+
+  const nextPage = useCallback(() => {
+    if (pagination.hasNextPage) {
+      goToPage(pagination.currentPage + 1);
+    }
+  }, [goToPage]);
+
+  const previousPage = useCallback(() => {
+    if (pagination.hasPreviousPage) {
+      goToPage(pagination.currentPage - 1);
+    }
+  }, [goToPage]);
+
+  const changePageSize = useCallback((newPageSize) => {
+    const safePage = Math.max(1, Math.min(newPageSize, 1000));
+    fetchData(1, safePage); // Go to first page when changing page size
+  }, [fetchData]);
+
+  const refresh = useCallback(() => {
+    fetchData(pagination.currentPage, pagination.pageSize);
+  }, [fetchData]);
+
+  const search = useCallback((searchFilters) => {
+    fetchData(1, pagination.pageSize, searchFilters); // Go to first page when searching
+  }, [fetchData]);
+
+  // Initial data fetch - only run once on mount
+  useEffect(() => {
+    fetchData();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return {
+    // Data
+    data,
+    pagination,
+    loading,
+    error,
+    
+    // Actions
+    goToPage,
+    nextPage,
+    previousPage,
+    changePageSize,
+    refresh,
+    search,
+    
+    // Computed values for convenience
+    isEmpty: data.length === 0 && !loading,
+    isFirstPage: pagination.currentPage === 1,
+    isLastPage: pagination.currentPage === pagination.totalPages,
+    totalItems: pagination.totalCount,
+    hasData: data.length > 0
+  };
+};
