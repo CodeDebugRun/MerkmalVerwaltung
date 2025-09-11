@@ -13,7 +13,7 @@ const {
   findNextSafePosition
 } = require('../utils/positionManager');
 
-// Bütün kayıtları getiren fonksiyon (READ ALL) - with pagination support
+// Funktion zum Abrufen aller Datensätze (READ ALL) - mit Pagination-Unterstützung
 const getAllMerkmalstexte = async (req, res, next) => {
   console.log('🔍 [DEBUG] getAllMerkmalstexte function started');
   console.log('📥 [DEBUG] Request query parameters:', req.query);
@@ -58,11 +58,11 @@ const getAllMerkmalstexte = async (req, res, next) => {
     console.log('✅ [DEBUG] Main data query executed successfully');
     console.log('📝 [DEBUG] Records retrieved:', result.recordset.length);
     
-    // Frontend için alanları eşleştirelim
+    // Felder für das Frontend zuordnen
     console.log('🔄 [DEBUG] Mapping database fields to frontend fields...');
     const recordsWithNewFields = result.recordset.map(record => ({
       ...record,
-      // Database'deki gerçek sütunları frontend alanlarına eşleştiriyoruz
+      // Wir ordnen die tatsächlichen Datenbankspalten den Frontend-Feldern zu
       position: record.merkmalsposition,
       sonderAbt: record.maka,
       fertigungsliste: record.fertigungsliste
@@ -94,7 +94,7 @@ const getAllMerkmalstexte = async (req, res, next) => {
   }
 };
 
-// ID'ye göre tek bir kayıt getiren fonksiyon (READ ONE)
+// Funktion zum Abrufen eines einzelnen Datensatzes nach ID (READ ONE)
 const getMerkmalstextById = async (req, res, next) => {
   const { id } = req.params;
   
@@ -114,7 +114,7 @@ const getMerkmalstextById = async (req, res, next) => {
       return res.status(404).json(formatError('Datensatz mit dieser ID wurde nicht gefunden'));
     }
     
-    // Frontend için alanları eşleştirelim
+    // Felder für das Frontend zuordnen
     const record = result.recordset[0];
     const recordWithNewFields = {
       ...record,
@@ -129,7 +129,7 @@ const getMerkmalstextById = async (req, res, next) => {
   }
 };
 
-// Yeni bir kayıt oluşturan fonksiyon (CREATE)
+// Funktion zum Erstellen eines neuen Datensatzes (CREATE)
 const createMerkmalstext = async (req, res, next) => {
   console.log('🆕 [DEBUG] createMerkmalstext function started');
   console.log('📥 [DEBUG] Request body:', req.body);
@@ -186,7 +186,7 @@ const createMerkmalstext = async (req, res, next) => {
                 SELECT * FROM merkmalstexte WHERE id = SCOPE_IDENTITY()`);
     });
 
-    // Frontend için yeni alanları ekleyelim
+    // Neue Felder für das Frontend hinzufügen
     const record = result.recordset[0];
     const createdRecord = {
       ...record,
@@ -200,7 +200,7 @@ const createMerkmalstext = async (req, res, next) => {
   }
 };
 
-// Bir kaydı güncelleyen fonksiyon (UPDATE)
+// Funktion zum Aktualisieren eines Datensatzes (UPDATE)
 const updateMerkmalstext = async (req, res, next) => {
   const { id } = req.params;
   const { identnr, merkmal, auspraegung, drucktext, sondermerkmal, position, sonderAbt, fertigungsliste } = req.body;
@@ -271,7 +271,7 @@ const updateMerkmalstext = async (req, res, next) => {
       return res.status(404).json(formatError('Datensatz mit dieser ID wurde nicht gefunden'));
     }
     
-    // Frontend için alanları eşleştirelim
+    // Felder für das Frontend zuordnen
     const record = result.recordset[0];
     const updatedRecord = {
       ...record,
@@ -285,7 +285,7 @@ const updateMerkmalstext = async (req, res, next) => {
   }
 };
 
-// Bir kaydı kısmen güncelleyen fonksiyon (PATCH)
+// Funktion zum teilweisen Aktualisieren eines Datensatzes (PATCH)
 const patchMerkmalstext = async (req, res, next) => {
   const { id } = req.params;
   const updateFields = req.body;
@@ -364,7 +364,7 @@ const patchMerkmalstext = async (req, res, next) => {
       return res.status(404).json(formatError('Datensatz mit dieser ID wurde nicht gefunden'));
     }
     
-    // Frontend için alanları eşleştirelim
+    // Felder für das Frontend zuordnen
     const record = result.recordset[0];
     const patchedRecord = {
       ...record,
@@ -379,7 +379,7 @@ const patchMerkmalstext = async (req, res, next) => {
   }
 };
 
-// Bir kaydı silen fonksiyon (DELETE)
+// Funktion zum Löschen eines Datensatzes (DELETE)
 const deleteMerkmalstext = async (req, res, next) => {
   const { id } = req.params;
   

@@ -28,7 +28,7 @@ app.use('/api', connectionManager.healthCheckMiddleware());
 
 app.use(express.json());
 
-// Route'ları import et / Routen importieren
+// Routen importieren
 const merkmalstexteRoutes = require('./routes/merkmalstexteRoutes');
 
 // Test endpoint
@@ -46,7 +46,7 @@ app.get('/db-test', async (req, res) => {
   }
 });
 
-// API rotalarını /api öneki ile kullan
+// API-Routen mit /api Präfix verwenden
 
 app.use('/api', merkmalstexteRoutes);
 

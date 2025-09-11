@@ -1,30 +1,30 @@
 const sql = require('mssql');
 require('dotenv').config();
 
-// Temel konfigürasyon nesnesini oluşturuyoruz.
+// Grundlegende Konfiguration erstellen
 const config = {
   server: process.env.DB_HOST,
   database: process.env.DB_NAME,
   port: parseInt(process.env.DB_PORT),
   options: {
     encrypt: true,
-    trustServerCertificate: true // localhost geliştirme ortamı için sertifika hatalarını önler
+    trustServerCertificate: true // Verhindert Zertifikatsfehler für localhost-Entwicklungsumgebung
   }
 };
 
-// Şimdi kimlik doğrulama türünü .env dosyasına göre belirliyoruz.
+// Authentifizierungstyp basierend auf .env-Datei festlegen
 if (process.env.DB_USER) {
-  // Eğer DB_USER doluysa, SQL Server Authentication kullanılır.
+  // Falls DB_USER gefüllt ist, wird SQL Server Authentication verwendet
   config.user = process.env.DB_USER;
   config.password = process.env.DB_PASSWORD;
   config.options.trustedConnection = false;
 } else {
-  // Eğer DB_USER boşsa, Windows Authentication kullanılır.
+  // Falls DB_USER leer ist, wird Windows Authentication verwendet
   config.options.trustedConnection = true;
 }
 
 
-// Bağlantı havuzunu (connection pool) oluşturup bağlanmaya çalışıyoruz.
+// Connection Pool erstellen und Verbindung versuchen
 const poolPromise = new sql.ConnectionPool(config)
   .connect()
   .then(pool => {
