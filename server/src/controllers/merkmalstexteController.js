@@ -15,20 +15,36 @@ const {
 
 // Bütün kayıtları getiren fonksiyon (READ ALL) - with pagination support
 const getAllMerkmalstexte = async (req, res, next) => {
+  console.log('🔍 [DEBUG] getAllMerkmalstexte function started');
+  console.log('📥 [DEBUG] Request query parameters:', req.query);
+  
   try {
+    console.log('📊 [DEBUG] Connecting to database pool...');
     const pool = await poolPromise;
+    console.log('✅ [DEBUG] Database pool connection successful');
     
     // Extract pagination parameters with defaults and validation
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.max(1, Math.min(parseInt(req.query.limit) || 50, 1000)); // Max 1000 per page
     const offset = (page - 1) * limit;
     
+    console.log('📄 [DEBUG] Pagination parameters calculated:');
+    console.log('   - Page:', page);
+    console.log('   - Limit:', limit);
+    console.log('   - Offset:', offset);
+    
     // Get total count for pagination metadata
+    console.log('🔢 [DEBUG] Executing count query...');
     const countResult = await pool.request().query('SELECT COUNT(*) as total FROM merkmalstexte');
     const totalCount = countResult.recordset[0].total;
     const totalPages = Math.ceil(totalCount / limit);
     
+    console.log('📊 [DEBUG] Count query result:');
+    console.log('   - Total records:', totalCount);
+    console.log('   - Total pages:', totalPages);
+    
     // Get paginated records with proper ordering
+    console.log('🗄️ [DEBUG] Executing main data query with pagination...');
     const result = await pool.request()
       .input('offset', sql.Int, offset)
       .input('limit', sql.Int, limit)
@@ -39,7 +55,11 @@ const getAllMerkmalstexte = async (req, res, next) => {
         FETCH NEXT @limit ROWS ONLY
       `);
     
+    console.log('✅ [DEBUG] Main data query executed successfully');
+    console.log('📝 [DEBUG] Records retrieved:', result.recordset.length);
+    
     // Frontend için alanları eşleştirelim
+    console.log('🔄 [DEBUG] Mapping database fields to frontend fields...');
     const recordsWithNewFields = result.recordset.map(record => ({
       ...record,
       // Database'deki gerçek sütunları frontend alanlarına eşleştiriyoruz
@@ -48,7 +68,10 @@ const getAllMerkmalstexte = async (req, res, next) => {
       fertigungsliste: record.fertigungsliste
     }));
     
+    console.log('✅ [DEBUG] Field mapping completed');
+    
     // Return data with pagination metadata
+    console.log('📦 [DEBUG] Preparing response data with pagination metadata...');
     const responseData = {
       data: recordsWithNewFields,
       pagination: {
@@ -61,8 +84,12 @@ const getAllMerkmalstexte = async (req, res, next) => {
       }
     };
     
+    console.log('📤 [DEBUG] Sending successful response...');
+    console.log('✅ [DEBUG] getAllMerkmalstexte function completed successfully');
     res.status(200).json(formatSuccess(responseData, `Seite ${page} von ${totalPages} erfolgreich abgerufen`));
   } catch (err) {
+    console.log('❌ [DEBUG] Error in getAllMerkmalstexte:', err.message);
+    console.log('🔍 [DEBUG] Error details:', err);
     next(err);
   }
 };
@@ -104,16 +131,26 @@ const getMerkmalstextById = async (req, res, next) => {
 
 // Yeni bir kayıt oluşturan fonksiyon (CREATE)
 const createMerkmalstext = async (req, res, next) => {
+  console.log('🆕 [DEBUG] createMerkmalstext function started');
+  console.log('📥 [DEBUG] Request body:', req.body);
+  
   const { identnr, merkmal, auspraegung, drucktext, sondermerkmal, position, sonderAbt, fertigungsliste } = req.body;
   
+  console.log('✅ [DEBUG] Request body destructured successfully');
+  
   // Validate input data
+  console.log('🔍 [DEBUG] Starting input validation...');
   const validation = validateMerkmalstexte(req.body);
   if (!validation.isValid) {
+    console.log('❌ [DEBUG] Validation failed:', validation.errors);
     return res.status(400).json(formatValidationError(validation.errors));
   }
+  console.log('✅ [DEBUG] Input validation successful');
   
   try {
+    console.log('📊 [DEBUG] Connecting to database pool...');
     const pool = await poolPromise;
+    console.log('✅ [DEBUG] Database pool connection successful');
     
     // Determine position: use provided position or get next available
     let finalPosition = position ? parseInt(position) : null;
