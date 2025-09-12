@@ -36,6 +36,11 @@ export default function Home() {
     fertigungsliste: ''
   });
   const [darkMode, setDarkMode] = useState(false);
+  const [allIdentnrs, setAllIdentnrs] = useState([]);
+  const [selectedIdentnrs, setSelectedIdentnrs] = useState([]);
+  const [showIdentnrDropdown, setShowIdentnrDropdown] = useState(false);
+  const [similarDatasets, setSimilarDatasets] = useState([]);
+  const [originalRecord, setOriginalRecord] = useState(null);
 
   // Dark mode localStorage'dan yükle
   useEffect(() => {
@@ -67,6 +72,51 @@ export default function Home() {
 
   // API Base URL
   const API_BASE = 'http://localhost:3001/api/merkmalstexte';
+
+  // Tüm Ident-Nr'ları yükle
+  const loadAllIdentnrs = async () => {
+    try {
+      const response = await axios.get(`${API_BASE}/list/identnrs`);
+      if (response.data.success) {
+        setAllIdentnrs(response.data.data);
+      }
+    } catch (err) {
+      console.error('Fehler beim Laden der Ident-Nr Liste:', err);
+    }
+  };
+
+  // Component mount olduğunda Ident-Nr'ları yükle
+  useEffect(() => {
+    loadAllIdentnrs();
+  }, []);
+
+  // Dropdown dışına tıklandığında veya ESC'e basıldığında kapat
+  useEffect(() => {
+    if (!showIdentnrDropdown) return;
+
+    const handleClickOutside = (event) => {
+      if (!event.target.closest('.multi-select-container')) {
+        setShowIdentnrDropdown(false);
+      }
+    };
+
+    const handleEscKey = (event) => {
+      if (event.key === 'Escape') {
+        setShowIdentnrDropdown(false);
+      }
+    };
+
+    const timer = setTimeout(() => {
+      document.addEventListener('click', handleClickOutside);
+      document.addEventListener('keydown', handleEscKey);
+    }, 0);
+
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener('click', handleClickOutside);
+      document.removeEventListener('keydown', handleEscKey);
+    };
+  }, [showIdentnrDropdown]);
 
   // Erfolgsnachricht anzeigen (mit automatischem Ausblenden)
   const showSuccess = (message) => {
@@ -162,6 +212,10 @@ export default function Home() {
       fertigungsliste: '0'
     });
     setEditingItem(null);
+    setSelectedIdentnrs([]);
+    setSimilarDatasets([]);
+    setOriginalRecord(null);
+    setShowIdentnrDropdown(false);
   };
 
   // Formular absenden
@@ -169,42 +223,141 @@ export default function Home() {
     e.preventDefault();
     
     // Formular-Validierung
-    if (!formData.identnr || !formData.merkmal || !formData.auspraegung || !formData.drucktext) {
+    if (selectedIdentnrs.length === 0 || !formData.merkmal || !formData.auspraegung || !formData.drucktext) {
       showSuccess('❌ Bitte füllen Sie alle Pflichtfelder aus');
       return;
     }
     
     const isUpdate = !!editingItem;
-    const operationType = isUpdate ? 'update' : 'create';
     
     try {
-      setOperationLoading(prev => ({ ...prev, [operationType]: true }));
+      setOperationLoading(prev => ({ ...prev, [isUpdate ? 'update' : 'create']: true }));
       
-      let response;
       if (isUpdate) {
-        response = await axios.put(`${API_BASE}/${editingItem.id}`, formData);
+        // Güncelleme: Sadece tek kayıt güncellesin
+        const dataToUpdate = { ...formData, identnr: selectedIdentnrs[0] };
+        const response = await axios.put(`${API_BASE}/${editingItem.id}`, dataToUpdate);
+        showSuccess(`✅ ${response.data.message || 'Datensatz aktualisiert'}`);
       } else {
-        response = await axios.post(API_BASE, formData);
+        // Yeni kayıt: Her seçili Ident-Nr için ayrı kayıt oluştur
+        for (const identnr of selectedIdentnrs) {
+          const dataToSubmit = { ...formData, identnr };
+          await axios.post(API_BASE, dataToSubmit);
+        }
+        showSuccess(`✅ ${selectedIdentnrs.length} adet kayıt başarıyla oluşturuldu!`);
       }
       
-      // Erfolgsmeldung vom API
-      if (response.data.success) {
-        showSuccess(`✅ ${response.data.message || (isUpdate ? 'Datensatz aktualisiert' : 'Datensatz erstellt')}`);
-        resetForm();
-        setShowForm(false);
-        refresh(); // Daten neu laden
-      } else {
-        throw new Error(response.data.message || 'Unbekannter Fehler');
-      }
+      resetForm();
+      setSelectedIdentnrs([]);
+      setShowForm(false);
+      refresh(); // Daten neu laden
     } catch (err) {
       handleApiError(err, isUpdate ? 'Fehler beim Aktualisieren' : 'Fehler beim Erstellen');
     } finally {
-      setOperationLoading(prev => ({ ...prev, [operationType]: false }));
+      setOperationLoading(prev => ({ ...prev, [isUpdate ? 'update' : 'create']: false }));
     }
   };
 
+
+
+
+  // Aynı datensatz'a ait kayıtları yükle
+  const loadSimilarDatasets = async (recordId) => {
+    try {
+      const response = await axios.get(`${API_BASE}/${recordId}/similar`);
+      if (response.data.success) {
+        setSimilarDatasets(response.data.data.records);
+        setOriginalRecord(response.data.data.records.find(r => r.id === response.data.data.originalId));
+        
+        // Benzer kayıtların Ident-Nr'lerini seçili olarak ayarla
+        const uniqueIdentnrs = [...new Set(response.data.data.records.map(record => record.identnr))];
+        setSelectedIdentnrs(uniqueIdentnrs);
+        
+        return response.data.data.records;
+      }
+    } catch (err) {
+      console.error('Fehler beim Laden ähnlicher Datensätze:', err);
+      handleApiError(err, 'Fehler beim Laden ähnlicher Datensätze');
+    }
+    return [];
+  };
+
+  // Ident-Nr çoklu seçim fonksiyonları
+  const toggleIdentnrSelection = async (identnr) => {
+    if (editingItem) {
+      // Edit modunda: checkbox kaldırılırsa kayıt sil, eklenmişse yeni kayıt oluştur
+      if (selectedIdentnrs.includes(identnr)) {
+        // Checkbox kaldırıldı - bu Ident-Nr'deki kaydı sil
+        const recordToDelete = similarDatasets.find(record => record.identnr === identnr);
+        if (recordToDelete) {
+          try {
+            setOperationLoading(prev => ({ ...prev, delete: true }));
+            console.log('🗑️ Deleting record:', recordToDelete.id, 'for identnr:', identnr);
+            console.log('🔍 Record to delete:', recordToDelete);
+            console.log('🌐 Delete URL:', `${API_BASE}/${recordToDelete.id}`);
+            await axios.delete(`${API_BASE}/${recordToDelete.id}`);
+            showSuccess(`✅ Datensatz für ${identnr} wurde gelöscht`);
+            
+            // State'leri güncelle
+            setSimilarDatasets(prev => prev.filter(record => record.identnr !== identnr));
+            setSelectedIdentnrs(prev => prev.filter(id => id !== identnr));
+            
+            // Ana listeyi yenile
+            refresh();
+          } catch (err) {
+            handleApiError(err, 'Fehler beim Löschen des Datensatzes');
+          } finally {
+            setOperationLoading(prev => ({ ...prev, delete: false }));
+          }
+        } else {
+          // Henüz kaydedilmemiş seçimi kaldır
+          setSelectedIdentnrs(prev => prev.filter(id => id !== identnr));
+        }
+      } else {
+        // Checkbox seçildi - yeni kayıt oluştur
+        try {
+          setOperationLoading(prev => ({ ...prev, create: true }));
+          // Position'ı otomatik olarak ayarlansın diye sıfırla
+          const dataToSubmit = { 
+            ...formData, 
+            identnr,
+            position: '' // Backend otomatik position belirleyecek
+          };
+          console.log('🔍 Creating new record for:', identnr, 'with data:', dataToSubmit);
+          await axios.post(API_BASE, dataToSubmit);
+          showSuccess(`✅ Neuer Datensatz für ${identnr} wurde erstellt`);
+          
+          // State'i güncelle
+          setSelectedIdentnrs(prev => [...prev, identnr]);
+          
+          // Ana listeyi yenile
+          refresh();
+          
+          // Benzer kayıtları yeniden yükle - mevcut item ID'sini kullan
+          if (editingItem?.id) {
+            await loadSimilarDatasets(editingItem.id);
+          }
+        } catch (err) {
+          handleApiError(err, 'Fehler beim Erstellen des Datensatzes');
+        } finally {
+          setOperationLoading(prev => ({ ...prev, create: false }));
+        }
+      }
+    } else {
+      // Yeni kayıt modu: sadece seçimi değiştir
+      setSelectedIdentnrs(prev => {
+        if (prev.includes(identnr)) {
+          return prev.filter(id => id !== identnr);
+        } else {
+          return [...prev, identnr];
+        }
+      });
+    }
+  };
+
+
   // Datensatz bearbeiten
-  const handleEdit = (item) => {
+  const handleEdit = async (item) => {
     setFormData({
       identnr: item.identnr || '',
       merkmal: item.merkmal || '',
@@ -215,7 +368,12 @@ export default function Home() {
       sonderAbt: item.sonderAbt?.toString() || '0',
       fertigungsliste: item.fertigungsliste?.toString() || '0'
     });
+    
     setEditingItem(item);
+    
+    // Edit modunda benzer kayıtları yükle
+    await loadSimilarDatasets(item.id);
+    
     setShowForm(true);
   };
 
@@ -467,20 +625,49 @@ export default function Home() {
           </section>
         )}
 
+
         {/* Formular */}
         {showForm && (
           <section className="form-section">
             <h3>{editingItem ? '✏️ Datensatz bearbeiten' : '➕ Neuen Datensatz hinzufügen'}</h3>
             <form onSubmit={handleSubmit} className="data-form">
               <div className="form-row">
-                <input
-                  type="text"
-                  placeholder="Ident-Nr. *"
-                  value={formData.identnr}
-                  onChange={(e) => handleInputChange('identnr', e.target.value)}
-                  required
-                  className="form-input"
-                />
+                <div className="multi-select-container">
+                  <div 
+                    className="multi-select-header form-input"
+                    onClick={() => setShowIdentnrDropdown(!showIdentnrDropdown)}
+                  >
+                    {selectedIdentnrs.length === 0 
+                      ? 'Ident-Nr. auswählen *' 
+                      : `${selectedIdentnrs.length} Ident-Nr ausgewählt (${selectedIdentnrs.join(', ')})`
+                    }
+                    <span className="dropdown-arrow">{showIdentnrDropdown ? '▲' : '▼'}</span>
+                  </div>
+                  
+                  {showIdentnrDropdown && (
+                    <div className="multi-select-dropdown">
+                      {allIdentnrs.map(identnr => (
+                        <label key={identnr} className="multi-select-item">
+                          <input
+                            type="checkbox"
+                            checked={selectedIdentnrs.includes(identnr)}
+                            onChange={() => toggleIdentnrSelection(identnr)}
+                            className="multi-select-checkbox"
+                          />
+                          <span className="multi-select-text">
+                            {identnr}
+                            {editingItem && originalRecord?.identnr === identnr && (
+                              <span className="star-badge"> ⭐</span>
+                            )}
+                          </span>
+                          {editingItem && originalRecord?.identnr === identnr && (
+                            <span className="original-badge">Original</span>
+                          )}
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <input
                   type="text"
                   placeholder="Merkmal *"
@@ -1282,6 +1469,130 @@ export default function Home() {
 
         .App.dark-mode .data-info {
           color: #888;
+        }
+
+        /* Multi-Select Dropdown Styles */
+        .multi-select-container {
+          position: relative;
+          width: 100%;
+        }
+
+        .multi-select-header {
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          background: #ffffff;
+          border: 2px solid #d1d5db;
+          padding: 12px 16px;
+          border-radius: 8px;
+          transition: all 0.2s ease;
+          color: #374151;
+        }
+
+        .multi-select-header:hover {
+          border-color: #3b82f6;
+          box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .dropdown-arrow {
+          font-size: 12px;
+          color: var(--text-secondary);
+          transition: transform 0.2s ease;
+        }
+
+        .multi-select-dropdown {
+          position: absolute;
+          top: 100%;
+          left: 0;
+          right: 0;
+          background: #ffffff;
+          border: 2px solid #3b82f6;
+          border-radius: 8px;
+          max-height: 400px;
+          overflow-y: auto;
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+          z-index: 1000;
+          margin-top: 4px;
+        }
+
+        .multi-select-item {
+          display: flex;
+          align-items: center;
+          padding: 10px 15px;
+          cursor: pointer;
+          border-bottom: 1px solid #e5e7eb;
+          transition: background-color 0.2s ease;
+          background: #ffffff;
+        }
+
+        .multi-select-item:hover {
+          background: #dbeafe;
+        }
+
+        .multi-select-item:last-child {
+          border-bottom: none;
+        }
+
+        .multi-select-checkbox {
+          margin-right: 8px;
+          transform: scale(1.1);
+        }
+
+        .multi-select-text {
+          flex: 1;
+          font-size: 0.9em;
+          color: #374151;
+          font-weight: 500;
+        }
+
+        .original-badge {
+          background: var(--pastel-indigo);
+          color: #6366f1;
+          padding: 2px 6px;
+          border-radius: 4px;
+          font-size: 0.7em;
+          font-weight: 500;
+          margin-left: 8px;
+        }
+
+        .star-badge {
+          font-size: 0.9em;
+          margin-left: 4px;
+        }
+
+        /* Dark mode multi-select styles */
+        .App.dark-mode .multi-select-header {
+          background: #2d2d2d;
+          border-color: #444;
+          color: #e1e4e8;
+        }
+
+        .App.dark-mode .multi-select-header:hover {
+          border-color: #3b82f6;
+        }
+
+        .App.dark-mode .multi-select-dropdown {
+          background: #2d2d2d;
+          border-color: #444;
+        }
+
+        .App.dark-mode .multi-select-item {
+          color: #e1e4e8;
+          border-color: #3a3a3a;
+        }
+
+        .App.dark-mode .multi-select-item:hover {
+          background: #1e3a8a;
+        }
+
+        .App.dark-mode .multi-select-text {
+          color: #e1e4e8;
+        }
+
+        .App.dark-mode .original-badge {
+          background: #3730a3;
+          color: #a5b4fc;
         }
       `}</style>
     </div>

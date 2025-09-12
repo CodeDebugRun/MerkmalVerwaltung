@@ -450,6 +450,493 @@ const bulkUpdateMerkmalstextePositions = async (req, res, next) => {
   }
 };
 
+// Check for null ID records
+const checkNullIds = async (req, res, next) => {
+  console.log('🔍 [DEBUG] checkNullIds function started');
+  
+  try {
+    console.log('📊 [DEBUG] Connecting to database pool...');
+    const pool = await poolPromise;
+    console.log('✅ [DEBUG] Database pool connection successful');
+    
+    console.log('🗄️ [DEBUG] Executing null ID check query...');
+    const result = await pool.request()
+      .query(`
+        SELECT *
+        FROM merkmalstexte 
+        WHERE id IS NULL
+        ORDER BY identnr, merkmal
+      `);
+    
+    console.log('✅ [DEBUG] Null ID check query executed successfully');
+    console.log('📝 [DEBUG] Records with null IDs found:', result.recordset.length);
+    
+    if (result.recordset.length > 0) {
+      console.log('⚠️ [DEBUG] Found records with null IDs!');
+      result.recordset.forEach((record, index) => {
+        console.log(`[${index + 1}] identnr: ${record.identnr}, merkmal: ${record.merkmal}`);
+      });
+    }
+    
+    const responseData = {
+      nullIdRecords: result.recordset,
+      count: result.recordset.length,
+      hasNullIds: result.recordset.length > 0
+    };
+    
+    console.log('📤 [DEBUG] Sending successful response...');
+    console.log('✅ [DEBUG] checkNullIds function completed successfully');
+    res.status(200).json(formatSuccess(responseData, 
+      result.recordset.length > 0 
+        ? `${result.recordset.length} Datensätze mit NULL-ID gefunden`
+        : 'Keine Datensätze mit NULL-ID gefunden'
+    ));
+  } catch (err) {
+    console.log('❌ [DEBUG] Error in checkNullIds:', err.message);
+    console.log('🔍 [DEBUG] Error details:', err);
+    next(err);
+  }
+};
+
+// Check for duplicate Ident-Nr entries
+const checkDuplicateIdentnrs = async (req, res, next) => {
+  console.log('🔍 [DEBUG] checkDuplicateIdentnrs function started');
+  
+  try {
+    console.log('📊 [DEBUG] Connecting to database pool...');
+    const pool = await poolPromise;
+    console.log('✅ [DEBUG] Database pool connection successful');
+    
+    console.log('🗄️ [DEBUG] Executing duplicate identnr query...');
+    const result = await pool.request()
+      .query(`
+        SELECT 
+          identnr, 
+          COUNT(*) as record_count,
+          MIN(id) as first_id,
+          MAX(id) as last_id
+        FROM merkmalstexte 
+        WHERE identnr IS NOT NULL 
+        GROUP BY identnr
+        HAVING COUNT(*) > 1
+        ORDER BY record_count DESC, identnr
+      `);
+    
+    console.log('✅ [DEBUG] Duplicate identnr query executed successfully');
+    console.log('📝 [DEBUG] Duplicate identnrs found:', result.recordset.length);
+    
+    if (result.recordset.length > 0) {
+      console.log('⚠️ [DEBUG] Found duplicate Ident-Nr entries!');
+      result.recordset.forEach((record, index) => {
+        console.log(`[${index + 1}] ${record.identnr}: ${record.record_count} kayıt - ID aralığı: ${record.first_id}-${record.last_id}`);
+      });
+    }
+    
+    // Tüm Ident-Nr'ların istatistiklerini de al
+    const statsResult = await pool.request()
+      .query(`
+        SELECT 
+          COUNT(DISTINCT identnr) as unique_identnrs,
+          COUNT(*) as total_records,
+          AVG(CAST(record_counts.record_count AS FLOAT)) as avg_records_per_identnr
+        FROM (
+          SELECT identnr, COUNT(*) as record_count
+          FROM merkmalstexte 
+          WHERE identnr IS NOT NULL 
+          GROUP BY identnr
+        ) as record_counts
+      `);
+    
+    const stats = statsResult.recordset[0];
+    
+    const responseData = {
+      duplicates: result.recordset,
+      duplicateCount: result.recordset.length,
+      hasDuplicates: result.recordset.length > 0,
+      stats: {
+        uniqueIdentnrs: stats.unique_identnrs,
+        totalRecords: stats.total_records,
+        duplicateIdentnrs: result.recordset.length,
+        avgRecordsPerIdentnr: Math.round(stats.avg_records_per_identnr * 100) / 100
+      }
+    };
+    
+    console.log('📤 [DEBUG] Sending successful response...');
+    console.log('✅ [DEBUG] checkDuplicateIdentnrs function completed successfully');
+    res.status(200).json(formatSuccess(responseData, 
+      result.recordset.length > 0 
+        ? `${result.recordset.length} Ident-Nr mit mehreren Datensätzen gefunden`
+        : 'Keine doppelten Ident-Nr gefunden - jede Ident-Nr hat nur einen Datensatz'
+    ));
+  } catch (err) {
+    console.log('❌ [DEBUG] Error in checkDuplicateIdentnrs:', err.message);
+    console.log('🔍 [DEBUG] Error details:', err);
+    next(err);
+  }
+};
+
+// Get all records by Ident-Nr
+const getMerkmalstexteByIdentnr = async (req, res, next) => {
+  console.log('🔍 [DEBUG] getMerkmalstexteByIdentnr function started');
+  const { identnr } = req.params;
+  console.log('📥 [DEBUG] Request params identnr:', identnr);
+  
+  if (!identnr) {
+    return res.status(400).json(formatValidationError(['Ident-Nr ist erforderlich']));
+  }
+  
+  try {
+    console.log('📊 [DEBUG] Connecting to database pool...');
+    const pool = await poolPromise;
+    console.log('✅ [DEBUG] Database pool connection successful');
+    
+    console.log('🗄️ [DEBUG] Executing get records by identnr query...');
+    const result = await pool.request()
+      .input('identnr', sql.VarChar, identnr)
+      .query(`
+        SELECT * FROM merkmalstexte 
+        WHERE identnr = @identnr
+        ORDER BY merkmalsposition, merkmal
+      `);
+    
+    console.log('✅ [DEBUG] Get records by identnr query executed successfully');
+    console.log('📝 [DEBUG] Records found:', result.recordset.length);
+    
+    // Felder für das Frontend zuordnen
+    const recordsWithMappedFields = result.recordset.map(record => ({
+      ...record,
+      position: record.merkmalsposition,
+      sonderAbt: record.maka,
+      fertigungsliste: record.fertigungsliste
+    }));
+    
+    console.log('📤 [DEBUG] Sending successful response...');
+    console.log('✅ [DEBUG] getMerkmalstexteByIdentnr function completed successfully');
+    res.status(200).json(formatSuccess(recordsWithMappedFields, 
+      `${result.recordset.length} Datensätze für Ident-Nr ${identnr} gefunden`));
+  } catch (err) {
+    console.log('❌ [DEBUG] Error in getMerkmalstexteByIdentnr:', err.message);
+    console.log('🔍 [DEBUG] Error details:', err);
+    next(err);
+  }
+};
+
+// Create new record for specific Ident-Nr
+const createMerkmalstextForIdentnr = async (req, res, next) => {
+  console.log('🆕 [DEBUG] createMerkmalstextForIdentnr function started');
+  const { identnr } = req.params;
+  console.log('📥 [DEBUG] Request params identnr:', identnr);
+  console.log('📥 [DEBUG] Request body:', req.body);
+  
+  if (!identnr) {
+    return res.status(400).json(formatValidationError(['Ident-Nr ist erforderlich']));
+  }
+  
+  const { merkmal, auspraegung, drucktext, sondermerkmal, position, sonderAbt, fertigungsliste } = req.body;
+  
+  // Validate input data (identnr wird aus params übernommen)
+  const dataToValidate = { identnr, merkmal, auspraegung, drucktext, sondermerkmal, position, sonderAbt, fertigungsliste };
+  console.log('🔍 [DEBUG] Starting input validation...');
+  const validation = validateMerkmalstexte(dataToValidate);
+  if (!validation.isValid) {
+    console.log('❌ [DEBUG] Validation failed:', validation.errors);
+    return res.status(400).json(formatValidationError(validation.errors));
+  }
+  console.log('✅ [DEBUG] Input validation successful');
+  
+  try {
+    console.log('📊 [DEBUG] Connecting to database pool...');
+    const pool = await poolPromise;
+    console.log('✅ [DEBUG] Database pool connection successful');
+    
+    // Determine position: use provided position or get next available
+    let finalPosition = position ? parseInt(position) : null;
+    if (!finalPosition) {
+      finalPosition = await getNextAvailablePosition(pool);
+    }
+    
+    // Execute within transaction for data integrity with position shifting
+    const result = await withTransaction(pool, async (transaction) => {
+      // Validate position uniqueness with row-level locking
+      const isPositionUnique = await validatePositionUniqueness(transaction, finalPosition);
+      if (!isPositionUnique) {
+        finalPosition = await findNextSafePosition(transaction, finalPosition);
+        console.log(`🔄 Position angepasst auf: ${finalPosition}`);
+      }
+      
+      // LEGACY LOGIC: Shift existing positions up before inserting
+      await shiftPositionsUp(transaction, finalPosition);
+      
+      const request = createRequest(transaction);
+      
+      return await request
+        .input('identnr', sql.VarChar, identnr) // Params'dan alınan identnr kullan
+        .input('merkmal', sql.VarChar, merkmal)
+        .input('auspraegung', sql.VarChar, auspraegung)
+        .input('drucktext', sql.VarChar, drucktext)
+        .input('sondermerkmal', sql.VarChar, sondermerkmal || '')
+        .input('merkmalsposition', sql.Int, finalPosition)
+        .input('maka', sql.Int, sonderAbt ? parseInt(sonderAbt) : null)
+        .input('fertigungsliste', sql.Int, fertigungsliste ? parseInt(fertigungsliste) : null)
+        .query(`INSERT INTO merkmalstexte (identnr, merkmal, auspraegung, drucktext, sondermerkmal, merkmalsposition, maka, fertigungsliste) 
+                VALUES (@identnr, @merkmal, @auspraegung, @drucktext, @sondermerkmal, @merkmalsposition, @maka, @fertigungsliste); 
+                SELECT * FROM merkmalstexte WHERE id = SCOPE_IDENTITY()`);
+    });
+
+    // Neue Felder für das Frontend hinzufügen
+    const record = result.recordset[0];
+    const createdRecord = {
+      ...record,
+      position: record.merkmalsposition || null,
+      sonderAbt: record.maka || null,
+      fertigungsliste: record.fertigungsliste || null
+    };
+    
+    console.log('📤 [DEBUG] Sending successful response...');
+    console.log('✅ [DEBUG] createMerkmalstextForIdentnr function completed successfully');
+    res.status(201).json(formatSuccess(createdRecord, `Datensatz für Ident-Nr ${identnr} erfolgreich erstellt`));
+  } catch (err) {
+    console.log('❌ [DEBUG] Error in createMerkmalstextForIdentnr:', err.message);
+    console.log('🔍 [DEBUG] Error details:', err);
+    next(err);
+  }
+};
+
+// Delete all records for specific Ident-Nr
+const deleteMerkmalstexteByIdentnr = async (req, res, next) => {
+  console.log('🗑️ [DEBUG] deleteMerkmalstexteByIdentnr function started');
+  const { identnr } = req.params;
+  console.log('📥 [DEBUG] Request params identnr:', identnr);
+  
+  if (!identnr) {
+    return res.status(400).json(formatValidationError(['Ident-Nr ist erforderlich']));
+  }
+  
+  try {
+    console.log('📊 [DEBUG] Connecting to database pool...');
+    const pool = await poolPromise;
+    console.log('✅ [DEBUG] Database pool connection successful');
+    
+    // Execute within transaction for data integrity
+    const result = await withTransaction(pool, async (transaction) => {
+      const request = createRequest(transaction);
+      
+      // Delete all records with this identnr
+      console.log('🗄️ [DEBUG] Executing delete query...');
+      const deleteResult = await request
+        .input('identnr', sql.VarChar, identnr)
+        .query('DELETE FROM merkmalstexte WHERE identnr = @identnr');
+      
+      console.log('✅ [DEBUG] Delete query executed successfully');
+      console.log('📊 [DEBUG] Rows affected:', deleteResult.rowsAffected[0]);
+      
+      return deleteResult;
+    });
+    
+    const deletedCount = result.rowsAffected[0];
+    
+    if (deletedCount === 0) {
+      return res.status(404).json(formatError(`Keine Datensätze für Ident-Nr ${identnr} gefunden`));
+    }
+    
+    console.log('📤 [DEBUG] Sending successful response...');
+    console.log('✅ [DEBUG] deleteMerkmalstexteByIdentnr function completed successfully');
+    res.status(200).json(formatSuccess(
+      { deletedCount }, 
+      `${deletedCount} Datensätze für Ident-Nr ${identnr} erfolgreich gelöscht`
+    ));
+  } catch (err) {
+    console.log('❌ [DEBUG] Error in deleteMerkmalstexteByIdentnr:', err.message);
+    console.log('🔍 [DEBUG] Error details:', err);
+    next(err);
+  }
+};
+
+// Get count of unique Ident-Nr values
+const getIdentnrCount = async (req, res, next) => {
+  console.log('🔢 [DEBUG] getIdentnrCount function started');
+  
+  try {
+    console.log('📊 [DEBUG] Connecting to database pool...');
+    const pool = await poolPromise;
+    console.log('✅ [DEBUG] Database pool connection successful');
+    
+    console.log('🗄️ [DEBUG] Executing count query...');
+    const result = await pool.request()
+      .query(`
+        SELECT 
+          COUNT(DISTINCT identnr) as unique_identnr_count,
+          COUNT(*) as total_records
+        FROM merkmalstexte 
+        WHERE identnr IS NOT NULL
+      `);
+    
+    console.log('✅ [DEBUG] Count query executed successfully');
+    
+    const stats = result.recordset[0];
+    
+    console.log('📝 [DEBUG] Statistics:');
+    console.log(`   - Unique Ident-Nr: ${stats.unique_identnr_count}`);
+    console.log(`   - Total Records: ${stats.total_records}`);
+    
+    const responseData = {
+      uniqueIdentnrs: stats.unique_identnr_count,
+      totalRecords: stats.total_records,
+      avgRecordsPerIdentnr: Math.round(stats.total_records / stats.unique_identnr_count * 100) / 100
+    };
+    
+    console.log('📤 [DEBUG] Sending successful response...');
+    console.log('✅ [DEBUG] getIdentnrCount function completed successfully');
+    res.status(200).json(formatSuccess(responseData, 
+      `${stats.unique_identnr_count} eindeutige Ident-Nr gefunden (${stats.total_records} Datensätze insgesamt)`));
+  } catch (err) {
+    console.log('❌ [DEBUG] Error in getIdentnrCount:', err.message);
+    console.log('🔍 [DEBUG] Error details:', err);
+    next(err);
+  }
+};
+
+// Get all unique Ident-Nr values (simple list)
+const getAllIdentnrs = async (req, res, next) => {
+  console.log('🔍 [DEBUG] getAllIdentnrs function started');
+  
+  try {
+    console.log('📊 [DEBUG] Connecting to database pool...');
+    const pool = await poolPromise;
+    console.log('✅ [DEBUG] Database pool connection successful');
+    
+    console.log('🗄️ [DEBUG] Executing all identnrs query...');
+    const result = await pool.request()
+      .query(`
+        SELECT DISTINCT identnr 
+        FROM merkmalstexte 
+        WHERE identnr IS NOT NULL 
+        ORDER BY identnr
+      `);
+    
+    console.log('✅ [DEBUG] All identnrs query executed successfully');
+    console.log('📝 [DEBUG] Unique identnrs found:', result.recordset.length);
+    
+    const identnrs = result.recordset.map(record => record.identnr);
+    
+    console.log('📤 [DEBUG] Sending successful response...');
+    console.log('✅ [DEBUG] getAllIdentnrs function completed successfully');
+    res.status(200).json(formatSuccess(identnrs, 
+      `${identnrs.length} eindeutige Ident-Nr erfolgreich abgerufen`));
+  } catch (err) {
+    console.log('❌ [DEBUG] Error in getAllIdentnrs:', err.message);
+    console.log('🔍 [DEBUG] Error details:', err);
+    next(err);
+  }
+};
+
+// Copy record to multiple Ident-Nr values
+const copyRecordToMultipleIdentnrs = async (req, res, next) => {
+  console.log('📋 [DEBUG] copyRecordToMultipleIdentnrs function started');
+  const { id } = req.params;
+  const { identnrs } = req.body;
+  console.log('📥 [DEBUG] Request params id:', id);
+  console.log('📥 [DEBUG] Request body identnrs:', identnrs);
+  
+  // Validate ID
+  const idValidation = validateId(id);
+  if (!idValidation.isValid) {
+    return res.status(400).json(formatValidationError(idValidation.errors));
+  }
+  
+  // Validate identnrs array
+  if (!identnrs || !Array.isArray(identnrs) || identnrs.length === 0) {
+    return res.status(400).json(formatValidationError(['Ident-Nr array ist erforderlich und darf nicht leer sein']));
+  }
+  
+  try {
+    console.log('📊 [DEBUG] Connecting to database pool...');
+    const pool = await poolPromise;
+    console.log('✅ [DEBUG] Database pool connection successful');
+    
+    // Get original record
+    console.log('🔍 [DEBUG] Getting original record...');
+    const originalResult = await pool.request()
+      .input('id', sql.Int, parseInt(id))
+      .query('SELECT * FROM merkmalstexte WHERE id = @id');
+    
+    if (originalResult.recordset.length === 0) {
+      return res.status(404).json(formatError('Original Datensatz nicht gefunden'));
+    }
+    
+    const originalRecord = originalResult.recordset[0];
+    console.log('📝 [DEBUG] Original record found:', originalRecord.identnr);
+    
+    // Execute within transaction for data integrity
+    const results = await withTransaction(pool, async (transaction) => {
+      const createdRecords = [];
+      
+      for (const targetIdentnr of identnrs) {
+        // Skip if it's the same as original
+        if (targetIdentnr === originalRecord.identnr) {
+          console.log(`⏭️ [DEBUG] Skipping same identnr: ${targetIdentnr}`);
+          continue;
+        }
+        
+        console.log(`🆕 [DEBUG] Creating copy for identnr: ${targetIdentnr}`);
+        
+        // Get next available position
+        let finalPosition = await getNextAvailablePosition(pool);
+        
+        // Validate position uniqueness with row-level locking
+        const isPositionUnique = await validatePositionUniqueness(transaction, finalPosition);
+        if (!isPositionUnique) {
+          finalPosition = await findNextSafePosition(transaction, finalPosition);
+          console.log(`🔄 Position angepasst auf: ${finalPosition}`);
+        }
+        
+        // Shift existing positions up before inserting
+        await shiftPositionsUp(transaction, finalPosition);
+        
+        const request = createRequest(transaction);
+        
+        const result = await request
+          .input('identnr', sql.VarChar, targetIdentnr)
+          .input('merkmal', sql.VarChar, originalRecord.merkmal)
+          .input('auspraegung', sql.VarChar, originalRecord.auspraegung)
+          .input('drucktext', sql.VarChar, originalRecord.drucktext)
+          .input('sondermerkmal', sql.VarChar, originalRecord.sondermerkmal || '')
+          .input('merkmalsposition', sql.Int, finalPosition)
+          .input('maka', sql.Int, originalRecord.maka)
+          .input('fertigungsliste', sql.Int, originalRecord.fertigungsliste)
+          .query(`INSERT INTO merkmalstexte (identnr, merkmal, auspraegung, drucktext, sondermerkmal, merkmalsposition, maka, fertigungsliste) 
+                  VALUES (@identnr, @merkmal, @auspraegung, @drucktext, @sondermerkmal, @merkmalsposition, @maka, @fertigungsliste); 
+                  SELECT * FROM merkmalstexte WHERE id = SCOPE_IDENTITY()`);
+        
+        if (result.recordset.length > 0) {
+          const newRecord = result.recordset[0];
+          createdRecords.push({
+            ...newRecord,
+            position: newRecord.merkmalsposition,
+            sonderAbt: newRecord.maka,
+            fertigungsliste: newRecord.fertigungsliste
+          });
+          console.log(`✅ [DEBUG] Created record ID ${newRecord.id} for identnr: ${targetIdentnr}`);
+        }
+      }
+      
+      return createdRecords;
+    });
+    
+    console.log('📤 [DEBUG] Sending successful response...');
+    console.log('✅ [DEBUG] copyRecordToMultipleIdentnrs function completed successfully');
+    res.status(201).json(formatSuccess({
+      originalRecord: originalRecord,
+      createdRecords: results,
+      copiedToIdentnrs: identnrs.filter(identnr => identnr !== originalRecord.identnr)
+    }, `Datensatz in ${results.length} neue Ident-Nr kopiert`));
+  } catch (err) {
+    console.log('❌ [DEBUG] Error in copyRecordToMultipleIdentnrs:', err.message);
+    console.log('🔍 [DEBUG] Error details:', err);
+    next(err);
+  }
+};
+
 // Advanced filtering endpoint - Legacy merkmalstexte.jsp functionality
 const getFilteredMerkmalstexte = async (req, res, next) => {
   const { identnr, merkmal, auspraegung, drucktext, sondermerkmal, position, sonderAbt, fertigungsliste, quickSearch, page, limit } = req.query;
@@ -570,6 +1057,70 @@ const getFilteredMerkmalstexte = async (req, res, next) => {
   }
 };
 
+// Aynı datensatz'a ait tüm kayıtları getir (merkmal, auspraegung, drucktext aynı olanlar)
+const getSimilarDatasets = async (req, res) => {
+  const { id } = req.params;
+
+  console.log(`🔍 [DEBUG] getSimilarDatasets function started for ID: ${id}`);
+
+  try {
+    const pool = await poolPromise;
+    
+    // Önce ilgili kaydın bilgilerini al
+    const originalRecord = await pool.request()
+      .input('id', sql.Int, id)
+      .query('SELECT merkmal, auspraegung, drucktext, sondermerkmal FROM merkmalstexte WHERE id = @id');
+
+    if (originalRecord.recordset.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Kayıt bulunamadı'
+      });
+    }
+
+    const { merkmal, auspraegung, drucktext, sondermerkmal } = originalRecord.recordset[0];
+    
+    console.log(`📊 [DEBUG] Original record data:`, { merkmal, auspraegung, drucktext, sondermerkmal });
+
+    // Aynı datensatz'a ait tüm kayıtları bul
+    const similarRecords = await pool.request()
+      .input('merkmal', sql.VarChar, merkmal)
+      .input('auspraegung', sql.VarChar, auspraegung)
+      .input('drucktext', sql.VarChar, drucktext)
+      .input('sondermerkmal', sql.VarChar, sondermerkmal || '')
+      .query(`
+        SELECT id, identnr, merkmal, auspraegung, drucktext, sondermerkmal, merkmalsposition, maka, fertigungsliste 
+        FROM merkmalstexte 
+        WHERE merkmal = @merkmal 
+          AND auspraegung = @auspraegung 
+          AND drucktext = @drucktext 
+          AND ISNULL(sondermerkmal, '') = @sondermerkmal
+        ORDER BY identnr, merkmalsposition
+      `);
+
+    console.log(`✅ [DEBUG] Found ${similarRecords.recordset.length} similar records`);
+
+    res.json({
+      success: true,
+      data: {
+        originalId: parseInt(id),
+        records: similarRecords.recordset,
+        count: similarRecords.recordset.length
+      },
+      timestamp: new Date().toISOString(),
+      message: `${similarRecords.recordset.length} adet benzer kayıt bulundu`
+    });
+
+  } catch (err) {
+    console.error('❌ [ERROR] getSimilarDatasets error:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Benzer kayıtlar alınırken bir hata oluştu',
+      error: err.message
+    });
+  }
+};
+
 module.exports = {
   getAllMerkmalstexte,
   getMerkmalstextById,
@@ -578,5 +1129,14 @@ module.exports = {
   patchMerkmalstext,
   deleteMerkmalstext,
   bulkUpdateMerkmalstextePositions,
-  getFilteredMerkmalstexte
+  getFilteredMerkmalstexte,
+  checkNullIds,
+  checkDuplicateIdentnrs,
+  getMerkmalstexteByIdentnr,
+  createMerkmalstextForIdentnr,
+  deleteMerkmalstexteByIdentnr,
+  getIdentnrCount,
+  getAllIdentnrs,
+  copyRecordToMultipleIdentnrs,
+  getSimilarDatasets
 };
