@@ -830,6 +830,93 @@ const getAllIdentnrs = async (req, res, next) => {
   }
 };
 
+// Add new custom Ident-Nr to database
+const addCustomIdentnr = async (req, res, next) => {
+  console.log('🆕 [DEBUG] addCustomIdentnr function started');
+  const { identnr } = req.body;
+  console.log('📥 [DEBUG] Request body identnr:', identnr);
+  
+  // Validate input
+  if (!identnr || !identnr.trim()) {
+    return res.status(400).json(formatValidationError(['Ident-Nr ist erforderlich']));
+  }
+  
+  const trimmedIdentnr = identnr.trim();
+  
+  try {
+    console.log('📊 [DEBUG] Connecting to database pool...');
+    const pool = await poolPromise;
+    console.log('✅ [DEBUG] Database pool connection successful');
+    
+    // Check if identnr already exists
+    console.log('🔍 [DEBUG] Checking if identnr already exists...');
+    const existsResult = await pool.request()
+      .input('identnr', sql.VarChar, trimmedIdentnr)
+      .query('SELECT COUNT(*) as count FROM merkmalstexte WHERE identnr = @identnr');
+    
+    const alreadyExists = existsResult.recordset[0].count > 0;
+    
+    if (alreadyExists) {
+      console.log('⚠️ [DEBUG] Identnr already exists in database');
+      return res.status(200).json(formatSuccess(
+        { identnr: trimmedIdentnr, existed: true }, 
+        `Ident-Nr ${trimmedIdentnr} existiert bereits`
+      ));
+    }
+    
+    // Create a placeholder record with minimal data to register the identnr
+    console.log('🆕 [DEBUG] Creating placeholder record for new identnr...');
+    const result = await withTransaction(pool, async (transaction) => {
+      // Get next available position
+      let finalPosition = await getNextAvailablePosition(pool);
+      
+      // Validate position uniqueness
+      const isPositionUnique = await validatePositionUniqueness(transaction, finalPosition);
+      if (!isPositionUnique) {
+        finalPosition = await findNextSafePosition(transaction, finalPosition);
+        console.log(`🔄 Position angepasst auf: ${finalPosition}`);
+      }
+      
+      // Shift existing positions up before inserting
+      await shiftPositionsUp(transaction, finalPosition);
+      
+      const request = createRequest(transaction);
+      
+      return await request
+        .input('identnr', sql.VarChar, trimmedIdentnr)
+        .input('merkmal', sql.VarChar, 'PLACEHOLDER')
+        .input('auspraegung', sql.VarChar, 'PLACEHOLDER')
+        .input('drucktext', sql.VarChar, 'PLACEHOLDER - Bitte bearbeiten')
+        .input('sondermerkmal', sql.VarChar, '')
+        .input('merkmalsposition', sql.Int, finalPosition)
+        .input('maka', sql.Int, null)
+        .input('fertigungsliste', sql.Int, 0)
+        .query(`INSERT INTO merkmalstexte (identnr, merkmal, auspraegung, drucktext, sondermerkmal, merkmalsposition, maka, fertigungsliste) 
+                VALUES (@identnr, @merkmal, @auspraegung, @drucktext, @sondermerkmal, @merkmalsposition, @maka, @fertigungsliste); 
+                SELECT * FROM merkmalstexte WHERE id = SCOPE_IDENTITY()`);
+    });
+    
+    const createdRecord = result.recordset[0];
+    
+    console.log('📤 [DEBUG] Sending successful response...');
+    console.log('✅ [DEBUG] addCustomIdentnr function completed successfully');
+    res.status(201).json(formatSuccess({
+      identnr: trimmedIdentnr,
+      existed: false,
+      placeholderRecord: {
+        ...createdRecord,
+        position: createdRecord.merkmalsposition,
+        sonderAbt: createdRecord.maka,
+        fertigungsliste: createdRecord.fertigungsliste
+      }
+    }, `Neue Ident-Nr ${trimmedIdentnr} erfolgreich hinzugefügt (Platzhalter-Datensatz erstellt)`));
+  } catch (err) {
+    console.log('❌ [DEBUG] Error in addCustomIdentnr:', err.message);
+    console.log('🔍 [DEBUG] Error details:', err);
+    next(err);
+  }
+};
+
 // Copy record to multiple Ident-Nr values
 const copyRecordToMultipleIdentnrs = async (req, res, next) => {
   console.log('📋 [DEBUG] copyRecordToMultipleIdentnrs function started');
@@ -1137,6 +1224,7 @@ module.exports = {
   deleteMerkmalstexteByIdentnr,
   getIdentnrCount,
   getAllIdentnrs,
+  addCustomIdentnr,
   copyRecordToMultipleIdentnrs,
   getSimilarDatasets
 };

@@ -21,6 +21,9 @@ router.get('/merkmalstexte/count/identnrs', controller.getIdentnrCount);
 // GET: All unique Ident-Nr values (simple list)
 router.get('/merkmalstexte/list/identnrs', controller.getAllIdentnrs);
 
+// POST: Add new custom Ident-Nr to database
+router.post('/merkmalstexte/add-identnr', controller.addCustomIdentnr);
+
 // POST: Copy record to multiple Ident-Nr values
 router.post('/merkmalstexte/:id/copy-to-identnrs', controller.copyRecordToMultipleIdentnrs);
 

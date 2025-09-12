@@ -41,6 +41,8 @@ export default function Home() {
   const [showIdentnrDropdown, setShowIdentnrDropdown] = useState(false);
   const [similarDatasets, setSimilarDatasets] = useState([]);
   const [originalRecord, setOriginalRecord] = useState(null);
+  const [customIdentnr, setCustomIdentnr] = useState('');
+  const [filteredIdentnrs, setFilteredIdentnrs] = useState([]);
 
   // Dark mode localStorage'dan yükle
   useEffect(() => {
@@ -89,6 +91,18 @@ export default function Home() {
   useEffect(() => {
     loadAllIdentnrs();
   }, []);
+
+  // Filter identnrs based on custom input
+  useEffect(() => {
+    if (customIdentnr.trim()) {
+      const filtered = allIdentnrs.filter(identnr => 
+        identnr.toLowerCase().includes(customIdentnr.toLowerCase())
+      );
+      setFilteredIdentnrs(filtered);
+    } else {
+      setFilteredIdentnrs(allIdentnrs);
+    }
+  }, [customIdentnr, allIdentnrs]);
 
   // Dropdown dışına tıklandığında veya ESC'e basıldığında kapat
   useEffect(() => {
@@ -216,6 +230,8 @@ export default function Home() {
     setSimilarDatasets([]);
     setOriginalRecord(null);
     setShowIdentnrDropdown(false);
+    setCustomIdentnr('');
+    setFilteredIdentnrs(allIdentnrs);
   };
 
   // Formular absenden
@@ -280,6 +296,61 @@ export default function Home() {
       handleApiError(err, 'Fehler beim Laden ähnlicher Datensätze');
     }
     return [];
+  };
+
+  // Handle adding custom Ident-Nr
+  const handleAddCustomIdentnr = async () => {
+    const trimmedValue = customIdentnr.trim();
+    if (!trimmedValue || selectedIdentnrs.includes(trimmedValue)) {
+      setCustomIdentnr('');
+      return;
+    }
+
+    try {
+      // Call backend to save the new identnr
+      const response = await axios.post(`${API_BASE}/add-identnr`, {
+        identnr: trimmedValue
+      });
+
+      if (response.data.success) {
+        // Add to selected list
+        setSelectedIdentnrs(prev => [...prev, trimmedValue]);
+        
+        // Add to allIdentnrs if not already exists (for future filtering)
+        if (!allIdentnrs.includes(trimmedValue)) {
+          setAllIdentnrs(prev => [...prev, trimmedValue]);
+        }
+
+        // Show success message
+        if (response.data.data.existed) {
+          showSuccess(`✅ Ident-Nr ${trimmedValue} ist bereits vorhanden`);
+        } else {
+          showSuccess(`✅ Neue Ident-Nr ${trimmedValue} erfolgreich hinzugefügt`);
+        }
+      }
+    } catch (err) {
+      handleApiError(err, 'Fehler beim Hinzufügen der neuen Ident-Nr');
+      
+      // Still add to local list even if backend fails (fallback)
+      setSelectedIdentnrs(prev => [...prev, trimmedValue]);
+      if (!allIdentnrs.includes(trimmedValue)) {
+        setAllIdentnrs(prev => [...prev, trimmedValue]);
+      }
+    }
+    
+    setCustomIdentnr('');
+    setShowIdentnrDropdown(false);
+  };
+
+  // Handle Enter key press in custom input
+  const handleCustomIdentnrKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleAddCustomIdentnr();
+    } else if (e.key === 'Escape') {
+      setShowIdentnrDropdown(false);
+      setCustomIdentnr('');
+    }
   };
 
   // Ident-Nr çoklu seçim fonksiyonları
@@ -638,7 +709,7 @@ export default function Home() {
                     onClick={() => setShowIdentnrDropdown(!showIdentnrDropdown)}
                   >
                     {selectedIdentnrs.length === 0 
-                      ? 'Ident-Nr. auswählen *' 
+                      ? 'Ident-Nr. auswählen oder eingeben *' 
                       : `${selectedIdentnrs.length} Ident-Nr ausgewählt (${selectedIdentnrs.join(', ')})`
                     }
                     <span className="dropdown-arrow">{showIdentnrDropdown ? '▲' : '▼'}</span>
@@ -646,7 +717,38 @@ export default function Home() {
                   
                   {showIdentnrDropdown && (
                     <div className="multi-select-dropdown">
-                      {allIdentnrs.map(identnr => (
+                      {/* Custom input field */}
+                      <div className="custom-input-container">
+                        <input
+                          type="text"
+                          placeholder="Neue Ident-Nr eingeben..."
+                          value={customIdentnr}
+                          onChange={(e) => setCustomIdentnr(e.target.value)}
+                          onKeyDown={handleCustomIdentnrKeyDown}
+                          className="custom-identnr-input"
+                          autoFocus
+                        />
+                        {customIdentnr.trim() && (
+                          <button
+                            type="button"
+                            onClick={handleAddCustomIdentnr}
+                            className="add-custom-btn"
+                            title="Hinzufügen"
+                          >
+                            ✓
+                          </button>
+                        )}
+                      </div>
+                      
+                      {/* Separator if there are existing options */}
+                      {filteredIdentnrs.length > 0 && (
+                        <div className="dropdown-separator">
+                          <span>Bestehende Ident-Nr auswählen:</span>
+                        </div>
+                      )}
+                      
+                      {/* Existing options */}
+                      {filteredIdentnrs.map(identnr => (
                         <label key={identnr} className="multi-select-item">
                           <input
                             type="checkbox"
@@ -665,6 +767,15 @@ export default function Home() {
                           )}
                         </label>
                       ))}
+                      
+                      {/* No results message */}
+                      {customIdentnr.trim() && filteredIdentnrs.length === 0 && (
+                        <div className="no-results">
+                          <em>Keine passenden Ident-Nr gefunden</em>
+                          <br />
+                          <small>Enter drücken um "{customIdentnr}" hinzuzufügen</small>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1593,6 +1704,107 @@ export default function Home() {
         .App.dark-mode .original-badge {
           background: #3730a3;
           color: #a5b4fc;
+        }
+
+        /* Custom input styles */
+        .custom-input-container {
+          display: flex;
+          align-items: center;
+          padding: 12px 15px;
+          border-bottom: 2px solid #e5e7eb;
+          background: #f8fafc;
+          border-radius: 8px 8px 0 0;
+        }
+
+        .custom-identnr-input {
+          flex: 1;
+          padding: 8px 12px;
+          border: 1px solid #d1d5db;
+          border-radius: 6px;
+          font-size: 14px;
+          background: #ffffff;
+          color: #374151;
+        }
+
+        .custom-identnr-input:focus {
+          outline: none;
+          border-color: #3b82f6;
+          box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+        }
+
+        .add-custom-btn {
+          margin-left: 8px;
+          padding: 6px 10px;
+          background: #10b981;
+          color: white;
+          border: none;
+          border-radius: 4px;
+          cursor: pointer;
+          font-size: 14px;
+          font-weight: 500;
+          transition: background-color 0.2s ease;
+        }
+
+        .add-custom-btn:hover {
+          background: #059669;
+        }
+
+        .dropdown-separator {
+          padding: 8px 15px;
+          background: #f3f4f6;
+          border-bottom: 1px solid #e5e7eb;
+          font-size: 12px;
+          font-weight: 500;
+          color: #6b7280;
+          text-align: center;
+        }
+
+        .no-results {
+          padding: 15px;
+          text-align: center;
+          color: #6b7280;
+          font-size: 14px;
+          border-bottom: 1px solid #e5e7eb;
+        }
+
+        .no-results small {
+          color: #9ca3af;
+          font-size: 12px;
+        }
+
+        /* Dark mode styles for custom input */
+        .App.dark-mode .custom-input-container {
+          background: #374151;
+          border-color: #4b5563;
+        }
+
+        .App.dark-mode .custom-identnr-input {
+          background: #2d2d2d;
+          border-color: #4b5563;
+          color: #e1e4e8;
+        }
+
+        .App.dark-mode .custom-identnr-input::placeholder {
+          color: #9ca3af;
+        }
+
+        .App.dark-mode .custom-identnr-input:focus {
+          border-color: #3b82f6;
+        }
+
+        .App.dark-mode .dropdown-separator {
+          background: #4b5563;
+          border-color: #6b7280;
+          color: #d1d5db;
+        }
+
+        .App.dark-mode .no-results {
+          color: #9ca3af;
+          border-color: #4b5563;
+        }
+
+        .App.dark-mode .no-results small {
+          color: #6b7280;
         }
       `}</style>
     </div>
