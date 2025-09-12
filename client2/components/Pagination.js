@@ -8,6 +8,7 @@ const Pagination = ({
   maxPageNumbers = 7 
 }) => {
   const [safePage, setSafePage] = useState(1);
+  const [goToPage, setGoToPage] = useState('');
   
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   
@@ -25,6 +26,21 @@ const Pagination = ({
     setSafePage(validPage);
     if (onPageChange) {
       onPageChange(validPage);
+    }
+  };
+
+  const handleGoToPageSubmit = (e) => {
+    e.preventDefault();
+    const pageNumber = parseInt(goToPage.trim(), 10);
+    if (!isNaN(pageNumber) && pageNumber >= 1 && pageNumber <= totalPages) {
+      handlePageChange(pageNumber);
+      setGoToPage('');
+    }
+  };
+
+  const handleGoToPageKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      handleGoToPageSubmit(e);
     }
   };
 
@@ -110,6 +126,21 @@ const Pagination = ({
         &#8250;
       </button>
 
+      <div className="go-to-page">
+        <span className="go-to-label">Gehe zu:</span>
+        <input
+          type="number"
+          min="1"
+          max={totalPages}
+          value={goToPage}
+          onChange={(e) => setGoToPage(e.target.value)}
+          onKeyDown={handleGoToPageKeyDown}
+          placeholder={`1-${totalPages}`}
+          className="go-to-input"
+          title={`Seitenzahl eingeben (1-${totalPages}) und Enter drücken`}
+        />
+      </div>
+
       <style jsx>{`
         .pagination-container {
           display: flex;
@@ -182,10 +213,52 @@ const Pagination = ({
           font-weight: 500;
         }
 
+        .go-to-page {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-left: 16px;
+          padding: 0 12px;
+          border-left: 1px solid #e1e4e8;
+          padding-left: 16px;
+        }
+
+        .go-to-label {
+          font-size: 14px;
+          color: #586069;
+          font-weight: 500;
+          white-space: nowrap;
+        }
+
+        .go-to-input {
+          width: 70px;
+          padding: 6px 8px;
+          border: 2px solid #e1e4e8;
+          border-radius: 6px;
+          font-size: 14px;
+          text-align: center;
+          background: #ffffff;
+          color: #586069;
+          transition: all 0.3s ease;
+        }
+
+        .go-to-input:focus {
+          outline: none;
+          border-color: #a5b4fc;
+          box-shadow: 0 0 0 3px rgba(165, 180, 252, 0.1);
+        }
+
+        .go-to-input::placeholder {
+          color: #8b949e;
+          font-size: 12px;
+        }
+
         @media (max-width: 640px) {
           .pagination-container {
             gap: 4px;
             margin: 20px 0;
+            flex-wrap: wrap;
+            justify-content: center;
           }
           
           .pagination-btn {
@@ -197,6 +270,27 @@ const Pagination = ({
           
           .pagination-ellipsis {
             padding: 8px 4px;
+            font-size: 13px;
+          }
+
+          .go-to-page {
+            margin-left: 0;
+            margin-top: 8px;
+            border-left: none;
+            border-top: 1px solid #e1e4e8;
+            padding-left: 0;
+            padding-top: 8px;
+            width: 100%;
+            justify-content: center;
+          }
+
+          .go-to-label {
+            font-size: 13px;
+          }
+
+          .go-to-input {
+            width: 60px;
+            padding: 5px 6px;
             font-size: 13px;
           }
         }
@@ -211,6 +305,16 @@ const Pagination = ({
           
           .pagination-ellipsis {
             padding: 6px 2px;
+            font-size: 12px;
+          }
+
+          .go-to-label {
+            font-size: 12px;
+          }
+
+          .go-to-input {
+            width: 55px;
+            padding: 4px 5px;
             font-size: 12px;
           }
         }

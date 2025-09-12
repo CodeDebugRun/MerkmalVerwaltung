@@ -43,12 +43,32 @@ export default function Home() {
   const [originalRecord, setOriginalRecord] = useState(null);
   const [customIdentnr, setCustomIdentnr] = useState('');
   const [filteredIdentnrs, setFilteredIdentnrs] = useState([]);
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+  const [showIdentnrColumn, setShowIdentnrColumn] = useState(false); // Default: gizli
+  const [showSettings, setShowSettings] = useState(false);
+  const [selectedFilterIdentnrs, setSelectedFilterIdentnrs] = useState([]);
+  const [showFilterIdentnrDropdown, setShowFilterIdentnrDropdown] = useState(false);
+  const [customFilterIdentnr, setCustomFilterIdentnr] = useState('');
+  const [filteredFilterIdentnrs, setFilteredFilterIdentnrs] = useState([]);
 
-  // Dark mode localStorage'dan yükle
+  // Ayarları localStorage'dan yükle - default değerler
   useEffect(() => {
+    // Dark mode - default: false (gündüz modu)
     const savedDarkMode = localStorage.getItem('darkMode');
     if (savedDarkMode) {
       setDarkMode(JSON.parse(savedDarkMode));
+    } else {
+      setDarkMode(false);
+      localStorage.setItem('darkMode', JSON.stringify(false));
+    }
+
+    // Identnr sütun görünürlüğü - default: false (gizli)
+    const savedShowIdentnrColumn = localStorage.getItem('showIdentnrColumn');
+    if (savedShowIdentnrColumn) {
+      setShowIdentnrColumn(JSON.parse(savedShowIdentnrColumn));
+    } else {
+      setShowIdentnrColumn(false);
+      localStorage.setItem('showIdentnrColumn', JSON.stringify(false));
     }
   }, []);
 
@@ -104,19 +124,33 @@ export default function Home() {
     }
   }, [customIdentnr, allIdentnrs]);
 
+  // Filter identnrs for filter dropdown based on custom input
+  useEffect(() => {
+    if (customFilterIdentnr.trim()) {
+      const filtered = allIdentnrs.filter(identnr => 
+        identnr.toLowerCase().includes(customFilterIdentnr.toLowerCase())
+      );
+      setFilteredFilterIdentnrs(filtered);
+    } else {
+      setFilteredFilterIdentnrs(allIdentnrs);
+    }
+  }, [customFilterIdentnr, allIdentnrs]);
+
   // Dropdown dışına tıklandığında veya ESC'e basıldığında kapat
   useEffect(() => {
-    if (!showIdentnrDropdown) return;
+    if (!showIdentnrDropdown && !showFilterIdentnrDropdown) return;
 
     const handleClickOutside = (event) => {
       if (!event.target.closest('.multi-select-container')) {
         setShowIdentnrDropdown(false);
+        setShowFilterIdentnrDropdown(false);
       }
     };
 
     const handleEscKey = (event) => {
       if (event.key === 'Escape') {
         setShowIdentnrDropdown(false);
+        setShowFilterIdentnrDropdown(false);
       }
     };
 
@@ -130,7 +164,7 @@ export default function Home() {
       document.removeEventListener('click', handleClickOutside);
       document.removeEventListener('keydown', handleEscKey);
     };
-  }, [showIdentnrDropdown]);
+  }, [showIdentnrDropdown, showFilterIdentnrDropdown]);
 
   // Erfolgsnachricht anzeigen (mit automatischem Ausblenden)
   const showSuccess = (message) => {
@@ -184,15 +218,36 @@ export default function Home() {
   // Suche durchführen (erweiterte Filter)
   const handleSearch = () => {
     const activeFilters = Object.keys(filterData).reduce((acc, key) => {
-      if (filterData[key] && filterData[key].toString().trim() !== '') {
+      if (key !== 'identnr' && filterData[key] && filterData[key].toString().trim() !== '') {
         acc[key] = filterData[key].toString().trim();
       }
       return acc;
     }, {});
+
+    // Ident-Nr seçimini filteye ekle - tek değer olarak
+    if (selectedFilterIdentnrs.length > 0) {
+      // Backend çoklu değerleri desteklemediği için sadece ilk değeri gönder
+      activeFilters.identnr = selectedFilterIdentnrs[0];
+      
+      // Debug için
+      console.log('🔍 Filtering with single Ident-Nr value:', {
+        selected: selectedFilterIdentnrs,
+        sentToBackend: selectedFilterIdentnrs[0],
+        note: 'Backend does not support multiple values'
+      });
+    }
     
     search(activeFilters);
-    if (Object.keys(activeFilters).length > 0) {
-      showSuccess('✅ Filter angewendet');
+    
+    const filterCount = Object.keys(activeFilters).length;
+    const identnrCount = selectedFilterIdentnrs.length;
+    
+    if (filterCount > 0 || identnrCount > 0) {
+      let message = '✅ Filter angewendet';
+      if (identnrCount > 0) {
+        message += ` (${identnrCount} Ident-Nr ausgewählt)`;
+      }
+      showSuccess(message);
     }
   };
 
@@ -208,6 +263,9 @@ export default function Home() {
       sonderAbt: '',
       fertigungsliste: ''
     });
+    setSelectedFilterIdentnrs([]);
+    setCustomFilterIdentnr('');
+    setFilteredFilterIdentnrs(allIdentnrs);
     setSearchTerm(''); // Arama terimini de temizle
     search({}); // Alle Daten neu laden
     showSuccess('✅ Filter gelöscht');
@@ -353,6 +411,21 @@ export default function Home() {
     }
   };
 
+  // Filter için Ident-Nr çoklu seçim fonksiyonları
+  const toggleFilterIdentnrSelection = (identnr) => {
+    setSelectedFilterIdentnrs(prev => {
+      if (prev.includes(identnr)) {
+        return prev.filter(id => id !== identnr);
+      } else {
+        // Backend çoklu filtreyi desteklemediği için tek seçim yap
+        return [identnr]; // Sadece bu seçimi tut, diğerlerini kaldır
+        
+        // Çoklu seçim için: return [...prev, identnr];
+      }
+    });
+  };
+
+
   // Ident-Nr çoklu seçim fonksiyonları
   const toggleIdentnrSelection = async (identnr) => {
     if (editingItem) {
@@ -360,13 +433,16 @@ export default function Home() {
       if (selectedIdentnrs.includes(identnr)) {
         // Checkbox kaldırıldı - bu Ident-Nr'deki kaydı sil
         const recordToDelete = similarDatasets.find(record => record.identnr === identnr);
-        if (recordToDelete) {
+        if (recordToDelete && recordToDelete.id) {
           try {
             setOperationLoading(prev => ({ ...prev, delete: true }));
             console.log('🗑️ Deleting record:', recordToDelete.id, 'for identnr:', identnr);
             console.log('🔍 Record to delete:', recordToDelete);
             console.log('🌐 Delete URL:', `${API_BASE}/${recordToDelete.id}`);
-            await axios.delete(`${API_BASE}/${recordToDelete.id}`);
+            
+            const response = await axios.delete(`${API_BASE}/${recordToDelete.id}`);
+            console.log('✅ Delete response:', response.data);
+            
             showSuccess(`✅ Datensatz für ${identnr} wurde gelöscht`);
             
             // State'leri güncelle
@@ -376,13 +452,32 @@ export default function Home() {
             // Ana listeyi yenile
             refresh();
           } catch (err) {
-            handleApiError(err, 'Fehler beim Löschen des Datensatzes');
+            console.error('❌ Delete error details:', {
+              status: err.response?.status,
+              statusText: err.response?.statusText,
+              data: err.response?.data,
+              recordId: recordToDelete.id,
+              url: `${API_BASE}/${recordToDelete.id}`
+            });
+            
+            if (err.response?.status === 404) {
+              // Record already deleted or doesn't exist
+              showSuccess(`⚠️ Datensatz für ${identnr} war bereits gelöscht`);
+              // Clean up the state anyway
+              setSimilarDatasets(prev => prev.filter(record => record.identnr !== identnr));
+              setSelectedIdentnrs(prev => prev.filter(id => id !== identnr));
+              refresh();
+            } else {
+              handleApiError(err, 'Fehler beim Löschen des Datensatzes');
+            }
           } finally {
             setOperationLoading(prev => ({ ...prev, delete: false }));
           }
         } else {
-          // Henüz kaydedilmemiş seçimi kaldır
+          // Henüz kaydedilmemiş seçimi kaldır veya geçersiz record
+          console.log('⚠️ No valid record found to delete for identnr:', identnr);
           setSelectedIdentnrs(prev => prev.filter(id => id !== identnr));
+          showSuccess(`⚠️ Kein gültiger Datensatz für ${identnr} gefunden`);
         }
       } else {
         // Checkbox seçildi - yeni kayıt oluştur
@@ -484,6 +579,90 @@ export default function Home() {
     }));
   };
 
+  // Sıralama fonksiyonu
+  const handleSort = (key) => {
+    let direction = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  // Custom sorting function for Identnr (alphanumeric)
+  const customSort = (items, key, direction) => {
+    if (!key) return items;
+
+    return [...items].sort((a, b) => {
+      let aValue = a[key];
+      let bValue = b[key];
+
+      if (key === 'identnr') {
+        // Special handling for Identnr - alphanumeric sort
+        const aStr = String(aValue || '');
+        const bStr = String(bValue || '');
+        
+        // Check if both are purely numeric
+        const aIsNumeric = /^\d+$/.test(aStr);
+        const bIsNumeric = /^\d+$/.test(bStr);
+        
+        if (aIsNumeric && bIsNumeric) {
+          // Both numeric - sort numerically
+          const result = parseInt(aStr, 10) - parseInt(bStr, 10);
+          return direction === 'asc' ? result : -result;
+        } else if (aIsNumeric && !bIsNumeric) {
+          // a is numeric, b is not - numeric comes first
+          return direction === 'asc' ? -1 : 1;
+        } else if (!aIsNumeric && bIsNumeric) {
+          // b is numeric, a is not - numeric comes first
+          return direction === 'asc' ? 1 : -1;
+        } else {
+          // Both are alphanumeric - natural sort
+          const result = aStr.localeCompare(bStr, 'de', { 
+            numeric: true, 
+            sensitivity: 'base',
+            caseFirst: 'lower'
+          });
+          return direction === 'asc' ? result : -result;
+        }
+      } else {
+        // Default sorting for other columns
+        const aVal = aValue || '';
+        const bVal = bValue || '';
+        
+        const result = String(aVal).localeCompare(String(bVal), 'de', {
+          numeric: true,
+          sensitivity: 'base'
+        });
+        return direction === 'asc' ? result : -result;
+      }
+    });
+  };
+
+  // Sıralanmış veri
+  const sortedMerkmalstexte = customSort(merkmalstexte, sortConfig.key, sortConfig.direction);
+
+  // ID kopyalama fonksiyonu
+  const copyToClipboard = async (text, type = 'ID') => {
+    try {
+      await navigator.clipboard.writeText(text);
+      showSuccess(`✅ ${type} wurde in die Zwischenablage kopiert: ${text}`);
+    } catch (err) {
+      // Fallback for older browsers
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      try {
+        document.execCommand('copy');
+        showSuccess(`✅ ${type} wurde in die Zwischenablage kopiert: ${text}`);
+      } catch (fallbackErr) {
+        showSuccess(`❌ Fehler beim Kopieren der ${type}`);
+      }
+      document.body.removeChild(textArea);
+    }
+  };
+
   // Sonder Abt. Renk adı gösterme fonksiyonu
   const getSonderAbtDisplay = (sonderAbtValue) => {
     if (!sonderAbtValue || sonderAbtValue === 0) {
@@ -569,10 +748,10 @@ export default function Home() {
           </button>
           <button 
             className="btn btn-secondary" 
-            onClick={toggleDarkMode}
-            title={darkMode ? "Light Mode aktivieren" : "Dark Mode aktivieren"}
+            onClick={() => setShowSettings(!showSettings)}
+            title="Einstellungen"
           >
-            {darkMode ? '◐' : '●'}
+            ⚙️ Einstellungen
           </button>
         </div>
       </header>
@@ -606,18 +785,133 @@ export default function Home() {
           </div>
         )}
 
+        {/* Ayarlar Paneli */}
+        {showSettings && (
+          <section className="settings-section">
+            <h3>⚙️ Einstellungen</h3>
+            <div className="settings-grid">
+              <div className="setting-item">
+                <label className="setting-label">
+                  <input
+                    type="checkbox"
+                    checked={darkMode}
+                    onChange={toggleDarkMode}
+                    className="setting-checkbox"
+                  />
+                  <span className="setting-text">
+                    {darkMode ? '🌙' : '☀️'} Dark Mode
+                  </span>
+                </label>
+              </div>
+              <div className="setting-item">
+                <label className="setting-label">
+                  <input
+                    type="checkbox"
+                    checked={showIdentnrColumn}
+                    onChange={(e) => {
+                      const newValue = e.target.checked;
+                      setShowIdentnrColumn(newValue);
+                      localStorage.setItem('showIdentnrColumn', JSON.stringify(newValue));
+                    }}
+                    className="setting-checkbox"
+                  />
+                  <span className="setting-text">
+                    👁️ Ident-Nr. Spalte anzeigen
+                  </span>
+                </label>
+              </div>
+            </div>
+            <div className="settings-actions">
+              <button 
+                className="btn btn-secondary"
+                onClick={() => setShowSettings(false)}
+              >
+                ✅ Schließen
+              </button>
+            </div>
+          </section>
+        )}
+
         {/* Erweiterte Filter */}
         {showFilters && (
           <section className="filter-section">
             <h3>🔍 Erweiterte Filter</h3>
             <div className="filter-grid">
-              <input
-                type="text"
-                placeholder="Ident-Nr."
-                value={filterData.identnr}
-                onChange={(e) => handleFilterChange('identnr', e.target.value)}
-                className="filter-input"
-              />
+              <div className="multi-select-container">
+                <div 
+                  className="multi-select-header filter-input"
+                  onClick={() => setShowFilterIdentnrDropdown(!showFilterIdentnrDropdown)}
+                >
+                  {selectedFilterIdentnrs.length === 0 
+                    ? 'Ident-Nr. auswählen' 
+                    : `${selectedFilterIdentnrs[0]}`
+                  }
+                  <span className="dropdown-arrow">{showFilterIdentnrDropdown ? '▲' : '▼'}</span>
+                </div>
+                
+                {showFilterIdentnrDropdown && (
+                  <div className="multi-select-dropdown">
+                    {/* Filter input for search */}
+                    <div className="custom-input-container">
+                      <input
+                        type="text"
+                        placeholder="Ident-Nr suchen..."
+                        value={customFilterIdentnr}
+                        onChange={(e) => setCustomFilterIdentnr(e.target.value)}
+                        className="custom-identnr-input"
+                        autoFocus
+                      />
+                    </div>
+                    
+                    {/* Selected items summary */}
+                    {selectedFilterIdentnrs.length > 0 && (
+                      <div className="selected-summary">
+                        <strong>Ausgewählt:</strong>
+                        <div className="selected-items">
+                          <span className="selected-tag">
+                            {selectedFilterIdentnrs[0]}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedFilterIdentnrs([]);
+                              }}
+                              className="remove-tag-btn"
+                              title={`${selectedFilterIdentnrs[0]} entfernen`}
+                            >
+                              ×
+                            </button>
+                          </span>
+                        </div>
+                        <small style={{color: '#8b949e', marginTop: '4px', display: 'block'}}>
+                          Hinweis: Nur eine Ident-Nr kann gleichzeitig gefiltert werden.
+                        </small>
+                      </div>
+                    )}
+                    
+                    {/* Existing options */}
+                    {filteredFilterIdentnrs.length > 0 ? (
+                      filteredFilterIdentnrs.map(identnr => (
+                        <label key={identnr} className="multi-select-item">
+                          <input
+                            type="checkbox"
+                            checked={selectedFilterIdentnrs.includes(identnr)}
+                            onChange={() => toggleFilterIdentnrSelection(identnr)}
+                            className="multi-select-checkbox"
+                          />
+                          <span className="multi-select-text">
+                            {identnr}
+                          </span>
+                        </label>
+                      ))
+                    ) : (
+                      <div className="no-results">
+                        <em>Keine passenden Ident-Nr gefunden</em>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
               <input
                 type="text"
                 placeholder="Merkmal"
@@ -915,7 +1209,16 @@ export default function Home() {
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Ident-Nr.</th>
+                    {showIdentnrColumn && (
+                      <th className="sortable" onClick={() => handleSort('identnr')}>
+                        Ident-Nr. 
+                        {sortConfig.key === 'identnr' && (
+                          <span className="sort-arrow">
+                            {sortConfig.direction === 'asc' ? ' ↑' : ' ↓'}
+                          </span>
+                        )}
+                      </th>
+                    )}
                     <th>Merkmal</th>
                     <th>Ausprägung</th>
                     <th>Drucktext</th>
@@ -927,10 +1230,21 @@ export default function Home() {
                   </tr>
                 </thead>
                 <tbody>
-                  {merkmalstexte.map((item) => (
+                  {sortedMerkmalstexte.map((item) => (
                     <tr key={item.id}>
-                      <td>{item.identnr}</td>
-                      <td>{item.merkmal}</td>
+                      {showIdentnrColumn && <td>{item.identnr}</td>}
+                      <td>
+                        <div className="merkmal-cell">
+                          <span className="merkmal-text">{item.merkmal}</span>
+                          <button
+                            className="copy-id-btn"
+                            onClick={() => copyToClipboard(item.id, 'ID')}
+                            title={`ID kopieren: ${item.id}`}
+                          >
+                            📋
+                          </button>
+                        </div>
+                      </td>
                       <td>{item.auspraegung}</td>
                       <td title={item.drucktext}>
                         {item.drucktext?.length > 30 
@@ -1244,7 +1558,7 @@ export default function Home() {
           background: rgba(0, 0, 0, 0.05);
         }
 
-        .filter-section, .form-section, .data-section {
+        .filter-section, .form-section, .data-section, .settings-section {
           background: #ffffff;
           border-radius: 16px;
           padding: 28px;
@@ -1266,7 +1580,7 @@ export default function Home() {
           }
         }
 
-        .filter-section h3, .form-section h3, .data-section h3 {
+        .filter-section h3, .form-section h3, .data-section h3, .settings-section h3 {
           margin-top: 0;
           margin-bottom: 20px;
           color: #586069;
@@ -1275,6 +1589,52 @@ export default function Home() {
           animation: fadeInUp 0.4s ease-out;
           animation-fill-mode: both;
           animation-delay: 0.1s;
+        }
+
+        .settings-grid {
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+          margin-bottom: 24px;
+        }
+
+        .setting-item {
+          padding: 12px;
+          border-radius: 8px;
+          background: #f6f8fa;
+          border: 1px solid #e1e4e8;
+          transition: all 0.3s ease;
+        }
+
+        .setting-item:hover {
+          background: #f1f3f4;
+          border-color: #d0d7de;
+        }
+
+        .setting-label {
+          display: flex;
+          align-items: center;
+          cursor: pointer;
+          margin: 0;
+          font-weight: 500;
+        }
+
+        .setting-checkbox {
+          margin-right: 12px;
+          transform: scale(1.2);
+          cursor: pointer;
+        }
+
+        .setting-text {
+          color: #586069;
+          font-size: 14px;
+          user-select: none;
+        }
+
+        .settings-actions {
+          display: flex;
+          justify-content: center;
+          gap: 12px;
         }
 
         .filter-grid {
@@ -1423,6 +1783,23 @@ export default function Home() {
           font-size: 14px;
         }
 
+        .data-table th.sortable {
+          cursor: pointer;
+          user-select: none;
+          transition: background-color 0.2s ease;
+        }
+
+        .data-table th.sortable:hover {
+          background: #f1f3f4;
+        }
+
+        .sort-arrow {
+          display: inline-block;
+          margin-left: 4px;
+          color: #586069;
+          font-weight: bold;
+        }
+
         .data-table td {
           padding: 14px 12px;
           border-bottom: 1px solid #e1e4e8;
@@ -1439,6 +1816,39 @@ export default function Home() {
           display: flex;
           gap: 6px;
           justify-content: center;
+        }
+
+        .merkmal-cell {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+        }
+
+        .merkmal-text {
+          flex: 1;
+        }
+
+        .copy-id-btn {
+          background: transparent;
+          border: none;
+          cursor: pointer;
+          padding: 4px 6px;
+          border-radius: 4px;
+          font-size: 12px;
+          opacity: 0.6;
+          transition: all 0.2s ease;
+          color: #586069;
+        }
+
+        .copy-id-btn:hover {
+          opacity: 1;
+          background: #f6f8fa;
+          transform: scale(1.1);
+        }
+
+        .copy-id-btn:active {
+          transform: scale(0.95);
         }
 
         @media (max-width: 768px) {
@@ -1515,12 +1925,26 @@ export default function Home() {
           border-color: #3b82f6;
         }
 
-        .App.dark-mode .filter-section, .App.dark-mode .form-section, .App.dark-mode .data-section {
+        .App.dark-mode .filter-section, .App.dark-mode .form-section, .App.dark-mode .data-section, .App.dark-mode .settings-section {
           background: #2d2d2d;
           border-color: #444;
         }
 
-        .App.dark-mode .filter-section h3, .App.dark-mode .form-section h3, .App.dark-mode .data-section h3 {
+        .App.dark-mode .filter-section h3, .App.dark-mode .form-section h3, .App.dark-mode .data-section h3, .App.dark-mode .settings-section h3 {
+          color: #e1e4e8;
+        }
+
+        .App.dark-mode .setting-item {
+          background: #3a3a3a;
+          border-color: #555;
+        }
+
+        .App.dark-mode .setting-item:hover {
+          background: #4a4a4a;
+          border-color: #666;
+        }
+
+        .App.dark-mode .setting-text {
           color: #e1e4e8;
         }
 
@@ -1549,6 +1973,14 @@ export default function Home() {
           color: #e1e4e8;
         }
 
+        .App.dark-mode .data-table th.sortable:hover {
+          background: #4a4a4a;
+        }
+
+        .App.dark-mode .sort-arrow {
+          color: #e1e4e8;
+        }
+
         .App.dark-mode .data-table td {
           border-color: #444;
           color: #e1e4e8;
@@ -1556,6 +1988,14 @@ export default function Home() {
 
         .App.dark-mode .data-table tr:hover {
           background: #3a3a3a;
+        }
+
+        .App.dark-mode .copy-id-btn {
+          color: #e1e4e8;
+        }
+
+        .App.dark-mode .copy-id-btn:hover {
+          background: #4a4a4a;
         }
 
         .App.dark-mode .success-message {
@@ -1805,6 +2245,74 @@ export default function Home() {
 
         .App.dark-mode .no-results small {
           color: #6b7280;
+        }
+
+        /* Selected items summary styles */
+        .selected-summary {
+          padding: 12px 15px;
+          background: #f8fafc;
+          border-bottom: 1px solid #e5e7eb;
+          font-size: 13px;
+        }
+
+        .selected-items {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 6px;
+          margin-top: 8px;
+        }
+
+        .selected-tag {
+          display: inline-flex;
+          align-items: center;
+          background: #dbeafe;
+          color: #1e40af;
+          padding: 4px 8px;
+          border-radius: 4px;
+          font-size: 12px;
+          font-weight: 500;
+          gap: 4px;
+        }
+
+        .remove-tag-btn {
+          background: none;
+          border: none;
+          color: #1e40af;
+          cursor: pointer;
+          font-size: 14px;
+          line-height: 1;
+          padding: 0;
+          width: 16px;
+          height: 16px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 2px;
+          transition: background-color 0.2s ease;
+        }
+
+        .remove-tag-btn:hover {
+          background: #bfdbfe;
+        }
+
+        /* Dark mode styles for selected summary */
+        .App.dark-mode .selected-summary {
+          background: #374151;
+          border-color: #4b5563;
+          color: #d1d5db;
+        }
+
+        .App.dark-mode .selected-tag {
+          background: #1e3a8a;
+          color: #bfdbfe;
+        }
+
+        .App.dark-mode .remove-tag-btn {
+          color: #bfdbfe;
+        }
+
+        .App.dark-mode .remove-tag-btn:hover {
+          background: #1e40af;
         }
       `}</style>
     </div>
