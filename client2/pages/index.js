@@ -39,14 +39,14 @@ export default function Home() {
   const [darkMode, setDarkMode] = useState(false);
   const [allIdentnrs, setAllIdentnrs] = useState([]);
   const [selectedIdentnrs, setSelectedIdentnrs] = useState([]);
-  const [showIdentnrDropdown, setShowIdentnrDropdown] = useState(false); // Ana form için
-  const [showInlineDropdown, setShowInlineDropdown] = useState(false); // Inline edit için
+  const [showIdentnrDropdown, setShowIdentnrDropdown] = useState(false); // Für Hauptformular
+  const [showInlineDropdown, setShowInlineDropdown] = useState(false); // Für Inline-Bearbeitung
   const [similarDatasets, setSimilarDatasets] = useState([]);
   const [originalRecord, setOriginalRecord] = useState(null);
   const [customIdentnr, setCustomIdentnr] = useState('');
   const [filteredIdentnrs, setFilteredIdentnrs] = useState([]);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
-  const [showIdentnrColumn, setShowIdentnrColumn] = useState(false); // Default: gizli
+  const [showIdentnrColumn, setShowIdentnrColumn] = useState(false); // Standard: versteckt
   const [showSettings, setShowSettings] = useState(false);
   const [selectedFilterIdentnrs, setSelectedFilterIdentnrs] = useState([]);
   const [showFilterIdentnrDropdown, setShowFilterIdentnrDropdown] = useState(false);
@@ -55,9 +55,9 @@ export default function Home() {
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
   const dropdownTriggerRef = useRef(null);
 
-  // Ayarları localStorage'dan yükle - default değerler
+  // Einstellungen aus localStorage laden - Standardwerte
   useEffect(() => {
-    // Dark mode - default: false (gündüz modu)
+    // Dark mode - Standard: false (Tagesmodus)
     const savedDarkMode = localStorage.getItem('darkMode');
     if (savedDarkMode) {
       setDarkMode(JSON.parse(savedDarkMode));
@@ -66,7 +66,7 @@ export default function Home() {
       localStorage.setItem('darkMode', JSON.stringify(false));
     }
 
-    // Identnr sütun görünürlüğü - default: false (gizli)
+    // Identnr Spalten-Sichtbarkeit - Standard: false (versteckt)
     const savedShowIdentnrColumn = localStorage.getItem('showIdentnrColumn');
     if (savedShowIdentnrColumn) {
       setShowIdentnrColumn(JSON.parse(savedShowIdentnrColumn));
@@ -99,7 +99,7 @@ export default function Home() {
   // API Base URL
   const API_BASE = 'http://localhost:3001/api/merkmalstexte';
 
-  // Tüm Ident-Nr'ları yükle
+  // Alle Ident-Nr laden
   const loadAllIdentnrs = async () => {
     try {
       const response = await axios.get(`${API_BASE}/list/identnrs`);
@@ -111,7 +111,7 @@ export default function Home() {
     }
   };
 
-  // Component mount olduğunda Ident-Nr'ları yükle
+  // Ident-Nr beim Komponenten-Mount laden
   useEffect(() => {
     loadAllIdentnrs();
   }, []);
@@ -140,7 +140,7 @@ export default function Home() {
     }
   }, [customFilterIdentnr, allIdentnrs]);
 
-  // Dropdown dışına tıklandığında veya ESC'e basıldığında kapat
+  // Dropdown schließen wenn außerhalb geklickt oder ESC gedrückt wird
   useEffect(() => {
     if (!showIdentnrDropdown && !showFilterIdentnrDropdown) return;
 
@@ -228,9 +228,9 @@ export default function Home() {
       return acc;
     }, {});
 
-    // Ident-Nr seçimini filteye ekle - tek değer olarak
+    // Ident-Nr Auswahl zum Filter hinzufügen - als Einzelwert
     if (selectedFilterIdentnrs.length > 0) {
-      // Backend çoklu değerleri desteklemediği için sadece ilk değeri gönder
+      // Da Backend keine Mehrfachwerte unterstützt, nur den ersten Wert senden
       activeFilters.identnr = selectedFilterIdentnrs[0];
       
           }
@@ -343,26 +343,26 @@ export default function Home() {
     try {
       setOperationLoading(prev => ({ ...prev, update: true }));
       
-      // Performance: Batch operations für alle Ident-Nr Änderungen
+      // Performance: Batch-Operationen für alle Ident-Nr Änderungen
       const originalIdentnrs = similarDatasets.filter(record => !record.isTemporary).map(r => r.identnr);
       const currentIdentnrs = selectedIdentnrs;
       
       
-      // Silinecek kayıtlar
+      // Zu löschende Datensätze
       const toDelete = originalIdentnrs.filter(identnr => !currentIdentnrs.includes(identnr));
-      // Eklenecek kayıtlar  
+      // Hinzuzufügende Datensätze  
       const toAdd = currentIdentnrs.filter(identnr => !originalIdentnrs.includes(identnr));
-      // Güncellenecek kayıtlar
+      // Zu aktualisierende Datensätze
       const toUpdate = currentIdentnrs.filter(identnr => originalIdentnrs.includes(identnr));
       
-      // Original logic: SADECE original silinirse yeni primary atanır
+      // Original-Logik: NUR wenn Original gelöscht wird, wird neuer Primary zugewiesen
       const originalWillBeDeleted = originalRecord && toDelete.includes(originalRecord.identnr);
       const newPrimary = originalWillBeDeleted && currentIdentnrs.length > 0 
-        ? currentIdentnrs[0]  // Sadece original silinirse ilk seçili yeni original olur
-        : originalRecord?.identnr; // Original korunuyorsa aynı kalır
+        ? currentIdentnrs[0]  // Nur wenn Original gelöscht wird, wird erste ausgewählte zum neuen Original
+        : originalRecord?.identnr; // Wenn Original erhalten bleibt, bleibt es gleich
       
       
-      // 1. Silme işlemleri
+      // 1. Löschvorgänge
       for (const identnr of toDelete) {
         const recordToDelete = similarDatasets.find(r => r.identnr === identnr && !r.isTemporary);
         if (recordToDelete?.id && !String(recordToDelete.id).startsWith('temp-')) {
@@ -370,37 +370,37 @@ export default function Home() {
         }
       }
       
-      // 2. Güncelleme işlemleri - Primary kayıt özel işlenir
+      // 2. Aktualisierungsvorgänge - Primary-Datensatz wird speziell behandelt
       for (let i = 0; i < toUpdate.length; i++) {
         const identnr = toUpdate[i];
         const recordToUpdate = similarDatasets.find(r => r.identnr === identnr && !r.isTemporary);
         if (recordToUpdate?.id && !String(recordToUpdate.id).startsWith('temp-')) {
           const dataToUpdate = { ...formData, identnr };
           
-          // Eğer original silinmişse ve bu ilk güncellenen kayıtsa, yeni primary olur
+          // Wenn Original gelöscht wurde und dies der erste aktualisierte Datensatz ist, wird er zum neuen Primary
           if (originalWillBeDeleted && identnr === newPrimary) {
-            // Primary kayıt olarak özel işlem gerekirse buraya eklenebilir
+            // Spezielle Behandlung für Primary-Datensatz kann hier hinzugefügt werden
           }
           
           await axios.put(`${API_BASE}/${recordToUpdate.id}`, dataToUpdate);
         }
       }
       
-      // 3. Ekleme işlemleri - Primary kayıt özel işlenir  
+      // 3. Hinzufügungsvorgänge - Primary-Datensatz wird speziell behandelt  
       for (let i = 0; i < toAdd.length; i++) {
         const identnr = toAdd[i];
         const dataToAdd = { ...formData, identnr, position: '' };
         
-        // Eğer hiç mevcut kayıt kalmamışsa, ilk eklenen primary olur
+        // Wenn keine bestehenden Datensätze übrig sind, wird der erste hinzugefügte zum Primary
         if (toUpdate.length === 0 && identnr === newPrimary) {
         }
         
         await axios.post(API_BASE, dataToAdd);
       }
       
-      // Local state güncelle: Yeni primary'i ayarla
+      // Lokalen Status aktualisieren: Neuen Primary festlegen
       if (originalWillBeDeleted && newPrimary) {
-        // Yeni primary'i originalRecord olarak ayarla
+        // Neuen Primary als originalRecord festlegen
         const newOriginalRecord = similarDatasets.find(r => r.identnr === newPrimary && !r.isTemporary) || 
                                  { identnr: newPrimary, ...formData };
         setOriginalRecord(newOriginalRecord);
@@ -409,7 +409,7 @@ export default function Home() {
       showSuccess(`✅ ${toDelete.length + toUpdate.length + toAdd.length} Operationen erfolgreich abgeschlossen`);
       
       resetForm();
-      refresh(); // Tek refresh tüm değişiklikler sonrası
+      refresh(); // Einzelne Aktualisierung nach allen Änderungen
     } catch (err) {
       handleApiError(err, 'Fehler beim Speichern der Änderungen');
     } finally {
@@ -420,7 +420,7 @@ export default function Home() {
 
 
 
-  // Aynı datensatz'a ait kayıtları yükle
+  // Datensätze desselben Datensatzes laden
   const loadSimilarDatasets = async (recordId) => {
     try {
       const response = await axios.get(`${API_BASE}/${recordId}/similar`);
@@ -428,7 +428,7 @@ export default function Home() {
         setSimilarDatasets(response.data.data.records);
         setOriginalRecord(response.data.data.records.find(r => r.id === response.data.data.originalId));
         
-        // Benzer kayıtların Ident-Nr'lerini seçili olarak ayarla
+        // Ident-Nr ähnlicher Datensätze als ausgewählt setzen
         const uniqueIdentnrs = [...new Set(response.data.data.records.map(record => record.identnr))];
         setSelectedIdentnrs(uniqueIdentnrs);
         
@@ -496,24 +496,24 @@ export default function Home() {
     }
   };
 
-  // Filter için Ident-Nr çoklu seçim fonksiyonları
+  // Ident-Nr Mehrfachauswahl-Funktionen für Filter
   const toggleFilterIdentnrSelection = (identnr) => {
     setSelectedFilterIdentnrs(prev => {
       if (prev.includes(identnr)) {
         return prev.filter(id => id !== identnr);
       } else {
-        // Backend çoklu filtreyi desteklemediği için tek seçim yap
-        return [identnr]; // Sadece bu seçimi tut, diğerlerini kaldır
+        // Da Backend keine Mehrfachfilter unterstützt, nur Einzelauswahl verwenden
+        return [identnr]; // Nur diese Auswahl behalten, andere entfernen
         
-        // Çoklu seçim için: return [...prev, identnr];
+        // Für Mehrfachauswahl: return [...prev, identnr];
       }
     });
   };
 
 
-  // Ident-Nr çoklu seçim fonksiyonları (Performance Optimized)
+  // Ident-Nr Mehrfachauswahl-Funktionen (Performance-optimiert)
   const toggleIdentnrSelection = async (identnr) => {
-    // Performance: Tüm API çağrıları kaldırıldı, sadece local state güncellemesi
+    // Performance: Alle API-Aufrufe entfernt, nur lokale Statusaktualisierung
     const isCurrentlySelected = selectedIdentnrs.includes(identnr);
     
     
@@ -527,14 +527,14 @@ export default function Home() {
       }
     });
     
-    // Visual feedback için local state güncelle (edit modunda) - SADECE temporary records
+    // Lokalen Status für visuelles Feedback aktualisieren (im Edit-Modus) - NUR temporäre Datensätze
     if (editingItem) {
       setSimilarDatasets(prev => {
         if (isCurrentlySelected) {
-          // Kaldırılıyor - SADECE temporary record'u kaldır, gerçek DB kayıtlarına dokunma!
+          // Wird entfernt - NUR temporären Datensatz entfernen, echte DB-Datensätze nicht berühren!
           return prev.filter(record => !(record.identnr === identnr && record.isTemporary));
         } else {
-          // Ekleniyor - temporary record ekle (visual)
+          // Wird hinzugefügt - temporären Datensatz hinzufügen (visuell)
           const tempRecord = {
             id: `temp-${identnr}`, // Temporary ID
             identnr,
@@ -619,7 +619,7 @@ export default function Home() {
     }));
   };
 
-  // Sıralama fonksiyonu
+  // Sortierfunktion
   const handleSort = (key) => {
     let direction = 'asc';
     if (sortConfig.key === key && sortConfig.direction === 'asc') {
@@ -678,10 +678,10 @@ export default function Home() {
     });
   };
 
-  // Sıralanmış veri
+  // Sortierte Daten
   const sortedMerkmalstexte = customSort(merkmalstexte, sortConfig.key, sortConfig.direction);
 
-  // ID kopyalama fonksiyonu
+  // ID-Kopierfunktion
   const copyToClipboard = async (text, type = 'ID') => {
     try {
       await navigator.clipboard.writeText(text);
@@ -703,7 +703,7 @@ export default function Home() {
     }
   };
 
-  // Sonder Abt. Renk adı gösterme fonksiyonu
+  // Sonder Abt. Farbnamen-Anzeigefunktion
   const getSonderAbtDisplay = (sonderAbtValue) => {
     if (!sonderAbtValue || sonderAbtValue === 0) {
       return '-';
@@ -729,7 +729,7 @@ export default function Home() {
       const rect = dropdownTriggerRef.current.getBoundingClientRect();
       
       setDropdownPosition({
-        top: rect.bottom + 4, // Fixed position kullandığımız için scroll offset'e gerek yok
+        top: rect.bottom + 4, // Da wir fixed position verwenden, ist kein scroll offset nötig
         left: rect.left,
         width: rect.width
       });
@@ -749,13 +749,13 @@ export default function Home() {
     setShowInlineDropdown(!showInlineDropdown);
   };
 
-  // Scroll, resize ve click outside handling için inline dropdown
+  // Scroll-, Resize- und Click-Outside-Behandlung für Inline-Dropdown
   useEffect(() => {
     if (showInlineDropdown) {
       const handleScroll = () => setShowInlineDropdown(false);
       const handleResize = () => updateDropdownPosition();
       const handleClickOutside = (event) => {
-        // Eğer tıklanan element dropdown trigger veya dropdown içeriği değilse kapat
+        // Dropdown schließen, wenn außerhalb des Triggers oder Inhalts geklickt wird
         if (dropdownTriggerRef.current && 
             !dropdownTriggerRef.current.contains(event.target) &&
             !event.target.closest('.portal-dropdown')) {
@@ -1144,7 +1144,7 @@ export default function Home() {
                             type="checkbox"
                             checked={selectedIdentnrs.includes(identnr)}
                             onChange={(e) => {
-                              e.stopPropagation(); // Dropdown'un kapanmasını engelle
+                              e.stopPropagation(); // Verhindern, dass Dropdown geschlossen wird
                               toggleIdentnrSelection(identnr);
                             }}
                             onClick={(e) => e.stopPropagation()} // Additional prevention
@@ -2725,7 +2725,7 @@ export default function Home() {
                 type="checkbox"
                 checked={selectedIdentnrs.includes(identnr)}
                 onChange={(e) => {
-                  e.stopPropagation(); // Dropdown'un kapanmasını engelle
+                  e.stopPropagation(); // Verhindern, dass Dropdown geschlossen wird
                   toggleIdentnrSelection(identnr);
                 }}
                 onClick={(e) => e.stopPropagation()} // Additional prevention
