@@ -39,7 +39,8 @@ export default function Home() {
   const [darkMode, setDarkMode] = useState(false);
   const [allIdentnrs, setAllIdentnrs] = useState([]);
   const [selectedIdentnrs, setSelectedIdentnrs] = useState([]);
-  const [showIdentnrDropdown, setShowIdentnrDropdown] = useState(false);
+  const [showIdentnrDropdown, setShowIdentnrDropdown] = useState(false); // Ana form için
+  const [showInlineDropdown, setShowInlineDropdown] = useState(false); // Inline edit için
   const [similarDatasets, setSimilarDatasets] = useState([]);
   const [originalRecord, setOriginalRecord] = useState(null);
   const [customIdentnr, setCustomIdentnr] = useState('');
@@ -335,7 +336,7 @@ export default function Home() {
     }
   };
 
-  // Inline-Bearbeitung absenden
+  // Inline-Bearbeitung absenden (Performance Optimized)
   const handleInlineSubmit = async (e) => {
     e.preventDefault();
     
@@ -348,15 +349,48 @@ export default function Home() {
     try {
       setOperationLoading(prev => ({ ...prev, update: true }));
       
-      // Aktualisierung: Nur den bearbeiteten Datensatz
-      const dataToUpdate = { ...formData, identnr: selectedIdentnrs[0] };
-      const response = await axios.put(`${API_BASE}/${editingItem.id}`, dataToUpdate);
-      showSuccess(`✅ ${response.data.message || 'Datensatz aktualisiert'}`);
+      // Performance: Batch operations für alle Ident-Nr Änderungen
+      const originalIdentnrs = similarDatasets.filter(record => !record.isTemporary).map(r => r.identnr);
+      const currentIdentnrs = selectedIdentnrs;
+      
+      // Silinecek kayıtlar
+      const toDelete = originalIdentnrs.filter(identnr => !currentIdentnrs.includes(identnr));
+      // Eklenecek kayıtlar  
+      const toAdd = currentIdentnrs.filter(identnr => !originalIdentnrs.includes(identnr));
+      // Güncellenecek kayıtlar
+      const toUpdate = currentIdentnrs.filter(identnr => originalIdentnrs.includes(identnr));
+      
+      console.log('🔄 Batch-Operationen:', { zuLöschen: toDelete, hinzuzufügen: toAdd, zuAktualisieren: toUpdate });
+      
+      // 1. Silme işlemleri
+      for (const identnr of toDelete) {
+        const recordToDelete = similarDatasets.find(r => r.identnr === identnr && !r.isTemporary);
+        if (recordToDelete?.id && !String(recordToDelete.id).startsWith('temp-')) {
+          await axios.delete(`${API_BASE}/${recordToDelete.id}`);
+        }
+      }
+      
+      // 2. Güncelleme işlemleri
+      for (const identnr of toUpdate) {
+        const recordToUpdate = similarDatasets.find(r => r.identnr === identnr && !r.isTemporary);
+        if (recordToUpdate?.id && !String(recordToUpdate.id).startsWith('temp-')) {
+          const dataToUpdate = { ...formData, identnr };
+          await axios.put(`${API_BASE}/${recordToUpdate.id}`, dataToUpdate);
+        }
+      }
+      
+      // 3. Ekleme işlemleri
+      for (const identnr of toAdd) {
+        const dataToAdd = { ...formData, identnr, position: '' };
+        await axios.post(API_BASE, dataToAdd);
+      }
+      
+      showSuccess(`✅ ${toDelete.length + toUpdate.length + toAdd.length} Operationen erfolgreich abgeschlossen`);
       
       resetForm();
-      refresh(); // Daten neu laden
+      refresh(); // Tek refresh tüm değişiklikler sonrası
     } catch (err) {
-      handleApiError(err, 'Fehler beim Aktualisieren');
+      handleApiError(err, 'Fehler beim Speichern der Änderungen');
     } finally {
       setOperationLoading(prev => ({ ...prev, update: false }));
     }
@@ -456,96 +490,38 @@ export default function Home() {
   };
 
 
-  // Ident-Nr çoklu seçim fonksiyonları
+  // Ident-Nr çoklu seçim fonksiyonları (Performance Optimized)
   const toggleIdentnrSelection = async (identnr) => {
-    if (editingItem) {
-      // Edit modunda: checkbox kaldırılırsa kayıt sil, eklenmişse yeni kayıt oluştur
-      if (selectedIdentnrs.includes(identnr)) {
-        // Checkbox kaldırıldı - bu Ident-Nr'deki kaydı sil
-        const recordToDelete = similarDatasets.find(record => record.identnr === identnr);
-        if (recordToDelete && recordToDelete.id) {
-          try {
-            setOperationLoading(prev => ({ ...prev, delete: true }));
-            console.log('🗑️ Deleting record:', recordToDelete.id, 'for identnr:', identnr);
-            console.log('🔍 Record to delete:', recordToDelete);
-            console.log('🌐 Delete URL:', `${API_BASE}/${recordToDelete.id}`);
-            
-            const response = await axios.delete(`${API_BASE}/${recordToDelete.id}`);
-            console.log('✅ Delete response:', response.data);
-            
-            showSuccess(`✅ Datensatz für ${identnr} wurde gelöscht`);
-            
-            // State'leri güncelle
-            setSimilarDatasets(prev => prev.filter(record => record.identnr !== identnr));
-            setSelectedIdentnrs(prev => prev.filter(id => id !== identnr));
-            
-            // Ana listeyi yenile
-            refresh();
-          } catch (err) {
-            console.error('❌ Delete error details:', {
-              status: err.response?.status,
-              statusText: err.response?.statusText,
-              data: err.response?.data,
-              recordId: recordToDelete.id,
-              url: `${API_BASE}/${recordToDelete.id}`
-            });
-            
-            if (err.response?.status === 404) {
-              // Record already deleted or doesn't exist
-              showSuccess(`⚠️ Datensatz für ${identnr} war bereits gelöscht`);
-              // Clean up the state anyway
-              setSimilarDatasets(prev => prev.filter(record => record.identnr !== identnr));
-              setSelectedIdentnrs(prev => prev.filter(id => id !== identnr));
-              refresh();
-            } else {
-              handleApiError(err, 'Fehler beim Löschen des Datensatzes');
-            }
-          } finally {
-            setOperationLoading(prev => ({ ...prev, delete: false }));
-          }
-        } else {
-          // Henüz kaydedilmemiş seçimi kaldır veya geçersiz record
-          console.log('⚠️ No valid record found to delete for identnr:', identnr);
-          setSelectedIdentnrs(prev => prev.filter(id => id !== identnr));
-          showSuccess(`⚠️ Kein gültiger Datensatz für ${identnr} gefunden`);
-        }
+    // Performance: Tüm API çağrıları kaldırıldı, sadece local state güncellemesi
+    setSelectedIdentnrs(prev => {
+      if (prev.includes(identnr)) {
+        return prev.filter(id => id !== identnr);
       } else {
-        // Checkbox seçildi - yeni kayıt oluştur
-        try {
-          setOperationLoading(prev => ({ ...prev, create: true }));
-          // Position'ı otomatik olarak ayarlansın diye sıfırla
-          const dataToSubmit = { 
-            ...formData, 
-            identnr,
-            position: '' // Backend otomatik position belirleyecek
-          };
-          console.log('🔍 Creating new record for:', identnr, 'with data:', dataToSubmit);
-          await axios.post(API_BASE, dataToSubmit);
-          showSuccess(`✅ Neuer Datensatz für ${identnr} wurde erstellt`);
-          
-          // State'i güncelle
-          setSelectedIdentnrs(prev => [...prev, identnr]);
-          
-          // Ana listeyi yenile
-          refresh();
-          
-          // Benzer kayıtları yeniden yükle - mevcut item ID'sini kullan
-          if (editingItem?.id) {
-            await loadSimilarDatasets(editingItem.id);
-          }
-        } catch (err) {
-          handleApiError(err, 'Fehler beim Erstellen des Datensatzes');
-        } finally {
-          setOperationLoading(prev => ({ ...prev, create: false }));
-        }
+        return [...prev, identnr];
       }
-    } else {
-      // Yeni kayıt modu: sadece seçimi değiştir
-      setSelectedIdentnrs(prev => {
-        if (prev.includes(identnr)) {
-          return prev.filter(id => id !== identnr);
+    });
+    
+    // Visual feedback için local state güncelle (edit modunda)
+    if (editingItem) {
+      setSimilarDatasets(prev => {
+        // Eğer identnr kaldırılıyorsa, local state'ten de kaldır (visual)
+        if (selectedIdentnrs.includes(identnr)) {
+          return prev.filter(record => record.identnr !== identnr);
         } else {
-          return [...prev, identnr];
+          // Eğer identnr ekleniyorsa, temporary record ekle (visual)
+          const tempRecord = {
+            id: `temp-${identnr}`, // Temporary ID
+            identnr,
+            merkmal: formData.merkmal,
+            auspraegung: formData.auspraegung,
+            drucktext: formData.drucktext,
+            sondermerkmal: formData.sondermerkmal,
+            position: formData.position,
+            sonderAbt: formData.sonderAbt,
+            fertigungsliste: formData.fertigungsliste,
+            isTemporary: true // Temporary record flag'i
+          };
+          return [...prev, tempRecord];
         }
       });
     }
@@ -734,29 +710,44 @@ export default function Home() {
     }
   };
 
-  // Dropdown açılırken pozisyon hesapla
+  // Ana form dropdown toggle
   const handleDropdownToggle = () => {
-    if (!showIdentnrDropdown) {
-      updateDropdownPosition();
-    }
     setShowIdentnrDropdown(!showIdentnrDropdown);
   };
 
-  // Scroll olduğunda dropdown'u kapat, resize'da pozisyon güncelle
+  // Inline edit dropdown toggle
+  const handleInlineDropdownToggle = () => {
+    if (!showInlineDropdown) {
+      updateDropdownPosition();
+    }
+    setShowInlineDropdown(!showInlineDropdown);
+  };
+
+  // Scroll, resize ve click outside handling için inline dropdown
   useEffect(() => {
-    if (showIdentnrDropdown) {
-      const handleScroll = () => setShowIdentnrDropdown(false);
+    if (showInlineDropdown) {
+      const handleScroll = () => setShowInlineDropdown(false);
       const handleResize = () => updateDropdownPosition();
+      const handleClickOutside = (event) => {
+        // Eğer tıklanan element dropdown trigger veya dropdown içeriği değilse kapat
+        if (dropdownTriggerRef.current && 
+            !dropdownTriggerRef.current.contains(event.target) &&
+            !event.target.closest('.portal-dropdown')) {
+          setShowInlineDropdown(false);
+        }
+      };
       
       window.addEventListener('scroll', handleScroll);
       window.addEventListener('resize', handleResize);
+      document.addEventListener('mousedown', handleClickOutside);
       
       return () => {
         window.removeEventListener('scroll', handleScroll);
         window.removeEventListener('resize', handleResize);
+        document.removeEventListener('mousedown', handleClickOutside);
       };
     }
-  }, [showIdentnrDropdown]);
+  }, [showInlineDropdown]);
 
   return (
     <div className={`App ${darkMode ? 'dark-mode' : ''}`}>
@@ -1126,7 +1117,11 @@ export default function Home() {
                           <input
                             type="checkbox"
                             checked={selectedIdentnrs.includes(identnr)}
-                            onChange={() => toggleIdentnrSelection(identnr)}
+                            onChange={(e) => {
+                              e.stopPropagation(); // Dropdown'un kapanmasını engelle
+                              toggleIdentnrSelection(identnr);
+                            }}
+                            onClick={(e) => e.stopPropagation()} // Additional prevention
                             className="multi-select-checkbox"
                           />
                           <span className="multi-select-text">
@@ -1374,13 +1369,13 @@ export default function Home() {
                                   <div 
                                     ref={dropdownTriggerRef}
                                     className="multi-select-header inline-form-input"
-                                    onClick={handleDropdownToggle}
+                                    onClick={handleInlineDropdownToggle}
                                   >
                                     {selectedIdentnrs.length === 0 
                                       ? 'Ident-Nr. auswählen oder eingeben *' 
                                       : `${selectedIdentnrs.length} Ident-Nr ausgewählt (${selectedIdentnrs.join(', ')})`
                                     }
-                                    <span className="dropdown-arrow">{showIdentnrDropdown ? '▲' : '▼'}</span>
+                                    <span className="dropdown-arrow">{showInlineDropdown ? '▲' : '▼'}</span>
                                   </div>
                                 </div>
                                 <input
@@ -2656,7 +2651,7 @@ export default function Home() {
       `}</style>
 
       {/* Portal Dropdown */}
-      {showIdentnrDropdown && typeof window !== 'undefined' && createPortal(
+      {showInlineDropdown && typeof window !== 'undefined' && createPortal(
         <div 
           className="multi-select-dropdown portal-dropdown"
           style={{
@@ -2703,7 +2698,11 @@ export default function Home() {
               <input
                 type="checkbox"
                 checked={selectedIdentnrs.includes(identnr)}
-                onChange={() => toggleIdentnrSelection(identnr)}
+                onChange={(e) => {
+                  e.stopPropagation(); // Dropdown'un kapanmasını engelle
+                  toggleIdentnrSelection(identnr);
+                }}
+                onClick={(e) => e.stopPropagation()} // Additional prevention
                 className="multi-select-checkbox"
               />
               <span className="multi-select-text">
