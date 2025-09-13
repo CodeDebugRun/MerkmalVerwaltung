@@ -233,13 +233,7 @@ export default function Home() {
       // Backend çoklu değerleri desteklemediği için sadece ilk değeri gönder
       activeFilters.identnr = selectedFilterIdentnrs[0];
       
-      // Debug için
-      console.log('🔍 Filtering with single Ident-Nr value:', {
-        selected: selectedFilterIdentnrs,
-        sentToBackend: selectedFilterIdentnrs[0],
-        note: 'Backend does not support multiple values'
-      });
-    }
+          }
     
     search(activeFilters);
     
@@ -353,6 +347,7 @@ export default function Home() {
       const originalIdentnrs = similarDatasets.filter(record => !record.isTemporary).map(r => r.identnr);
       const currentIdentnrs = selectedIdentnrs;
       
+      
       // Silinecek kayıtlar
       const toDelete = originalIdentnrs.filter(identnr => !currentIdentnrs.includes(identnr));
       // Eklenecek kayıtlar  
@@ -360,17 +355,12 @@ export default function Home() {
       // Güncellenecek kayıtlar
       const toUpdate = currentIdentnrs.filter(identnr => originalIdentnrs.includes(identnr));
       
-      // Original logic: İlk kalan kayıt yeni primary olur
+      // Original logic: SADECE original silinirse yeni primary atanır
       const originalWillBeDeleted = originalRecord && toDelete.includes(originalRecord.identnr);
-      const newPrimary = currentIdentnrs.length > 0 ? currentIdentnrs[0] : null;
+      const newPrimary = originalWillBeDeleted && currentIdentnrs.length > 0 
+        ? currentIdentnrs[0]  // Sadece original silinirse ilk seçili yeni original olur
+        : originalRecord?.identnr; // Original korunuyorsa aynı kalır
       
-      console.log('🔄 Batch-Operationen:', { 
-        zuLöschen: toDelete, 
-        hinzuzufügen: toAdd, 
-        zuAktualisieren: toUpdate,
-        originalGelöscht: originalWillBeDeleted,
-        neuerPrimary: newPrimary
-      });
       
       // 1. Silme işlemleri
       for (const identnr of toDelete) {
@@ -389,7 +379,6 @@ export default function Home() {
           
           // Eğer original silinmişse ve bu ilk güncellenen kayıtsa, yeni primary olur
           if (originalWillBeDeleted && identnr === newPrimary) {
-            console.log(`🌟 ${identnr} wird zum neuen Primary-Datensatz`);
             // Primary kayıt olarak özel işlem gerekirse buraya eklenebilir
           }
           
@@ -404,7 +393,6 @@ export default function Home() {
         
         // Eğer hiç mevcut kayıt kalmamışsa, ilk eklenen primary olur
         if (toUpdate.length === 0 && identnr === newPrimary) {
-          console.log(`🌟 ${identnr} wird zum neuen Primary-Datensatz (neu erstellt)`);
         }
         
         await axios.post(API_BASE, dataToAdd);
@@ -416,7 +404,6 @@ export default function Home() {
         const newOriginalRecord = similarDatasets.find(r => r.identnr === newPrimary && !r.isTemporary) || 
                                  { identnr: newPrimary, ...formData };
         setOriginalRecord(newOriginalRecord);
-        console.log(`🔄 Original record güncellendi: ${newPrimary}`);
       }
       
       showSuccess(`✅ ${toDelete.length + toUpdate.length + toAdd.length} Operationen erfolgreich abgeschlossen`);
@@ -527,22 +514,27 @@ export default function Home() {
   // Ident-Nr çoklu seçim fonksiyonları (Performance Optimized)
   const toggleIdentnrSelection = async (identnr) => {
     // Performance: Tüm API çağrıları kaldırıldı, sadece local state güncellemesi
+    const isCurrentlySelected = selectedIdentnrs.includes(identnr);
+    
+    
     setSelectedIdentnrs(prev => {
       if (prev.includes(identnr)) {
-        return prev.filter(id => id !== identnr);
+        const newState = prev.filter(id => id !== identnr);
+        return newState;
       } else {
-        return [...prev, identnr];
+        const newState = [...prev, identnr];
+        return newState;
       }
     });
     
-    // Visual feedback için local state güncelle (edit modunda)
+    // Visual feedback için local state güncelle (edit modunda) - SADECE temporary records
     if (editingItem) {
       setSimilarDatasets(prev => {
-        // Eğer identnr kaldırılıyorsa, local state'ten de kaldır (visual)
-        if (selectedIdentnrs.includes(identnr)) {
-          return prev.filter(record => record.identnr !== identnr);
+        if (isCurrentlySelected) {
+          // Kaldırılıyor - SADECE temporary record'u kaldır, gerçek DB kayıtlarına dokunma!
+          return prev.filter(record => !(record.identnr === identnr && record.isTemporary));
         } else {
-          // Eğer identnr ekleniyorsa, temporary record ekle (visual)
+          // Ekleniyor - temporary record ekle (visual)
           const tempRecord = {
             id: `temp-${identnr}`, // Temporary ID
             identnr,
