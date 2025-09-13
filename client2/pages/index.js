@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import Head from 'next/head';
 import { usePagination } from '../hooks/usePagination';
@@ -308,17 +308,17 @@ export default function Home() {
       setOperationLoading(prev => ({ ...prev, [isUpdate ? 'update' : 'create']: true }));
       
       if (isUpdate) {
-        // Güncelleme: Sadece tek kayıt güncellesin
+        // Aktualisierung: Nur einen Datensatz aktualisieren
         const dataToUpdate = { ...formData, identnr: selectedIdentnrs[0] };
         const response = await axios.put(`${API_BASE}/${editingItem.id}`, dataToUpdate);
         showSuccess(`✅ ${response.data.message || 'Datensatz aktualisiert'}`);
       } else {
-        // Yeni kayıt: Her seçili Ident-Nr için ayrı kayıt oluştur
+        // Neuer Datensatz: Für jede ausgewählte Ident-Nr einen separaten Datensatz erstellen
         for (const identnr of selectedIdentnrs) {
           const dataToSubmit = { ...formData, identnr };
           await axios.post(API_BASE, dataToSubmit);
         }
-        showSuccess(`✅ ${selectedIdentnrs.length} adet kayıt başarıyla oluşturuldu!`);
+        showSuccess(`✅ ${selectedIdentnrs.length} Datensätze erfolgreich erstellt!`);
       }
       
       resetForm();
@@ -329,6 +329,33 @@ export default function Home() {
       handleApiError(err, isUpdate ? 'Fehler beim Aktualisieren' : 'Fehler beim Erstellen');
     } finally {
       setOperationLoading(prev => ({ ...prev, [isUpdate ? 'update' : 'create']: false }));
+    }
+  };
+
+  // Inline-Bearbeitung absenden
+  const handleInlineSubmit = async (e) => {
+    e.preventDefault();
+    
+    // Formular-Validierung
+    if (selectedIdentnrs.length === 0 || !formData.merkmal || !formData.auspraegung || !formData.drucktext) {
+      showSuccess('❌ Bitte füllen Sie alle Pflichtfelder aus');
+      return;
+    }
+    
+    try {
+      setOperationLoading(prev => ({ ...prev, update: true }));
+      
+      // Aktualisierung: Nur den bearbeiteten Datensatz
+      const dataToUpdate = { ...formData, identnr: selectedIdentnrs[0] };
+      const response = await axios.put(`${API_BASE}/${editingItem.id}`, dataToUpdate);
+      showSuccess(`✅ ${response.data.message || 'Datensatz aktualisiert'}`);
+      
+      resetForm();
+      refresh(); // Daten neu laden
+    } catch (err) {
+      handleApiError(err, 'Fehler beim Aktualisieren');
+    } finally {
+      setOperationLoading(prev => ({ ...prev, update: false }));
     }
   };
 
@@ -524,6 +551,13 @@ export default function Home() {
 
   // Datensatz bearbeiten
   const handleEdit = async (item) => {
+    // Falls dieser Datensatz bereits bearbeitet wird, Bearbeitungsmodus schließen
+    if (editingItem && editingItem.id === item.id) {
+      setEditingItem(null);
+      resetForm();
+      return;
+    }
+    
     setFormData({
       identnr: item.identnr || '',
       merkmal: item.merkmal || '',
@@ -537,10 +571,11 @@ export default function Home() {
     
     setEditingItem(item);
     
-    // Edit modunda benzer kayıtları yükle
+    // Im Bearbeitungsmodus ähnliche Datensätze laden
     await loadSimilarDatasets(item.id);
     
-    setShowForm(true);
+    // Hauptformular schließen, da Inline-Formular verwendet wird
+    setShowForm(false);
   };
 
   // Datensatz löschen
@@ -681,6 +716,7 @@ export default function Home() {
     
     return colorNames[sonderAbtValue] || '-';
   };
+
 
   return (
     <div className={`App ${darkMode ? 'dark-mode' : ''}`}>
@@ -1231,56 +1267,227 @@ export default function Home() {
                 </thead>
                 <tbody>
                   {sortedMerkmalstexte.map((item) => (
-                    <tr key={item.id}>
-                      {showIdentnrColumn && <td>{item.identnr}</td>}
-                      <td>
-                        <div className="merkmal-cell">
-                          <span className="merkmal-text">{item.merkmal}</span>
-                          <button
-                            className="copy-id-btn"
-                            onClick={() => copyToClipboard(item.id, 'ID')}
-                            title={`ID kopieren: ${item.id}`}
-                          >
-                            📋
-                          </button>
-                        </div>
-                      </td>
-                      <td>{item.auspraegung}</td>
-                      <td title={item.drucktext}>
-                        {item.drucktext?.length > 30 
-                          ? `${item.drucktext.substring(0, 30)}...` 
-                          : item.drucktext
-                        }
-                      </td>
-                      <td>{item.sondermerkmal || '-'}</td>
-                      <td>{item.position || '-'}</td>
-                      <td>{getSonderAbtDisplay(item.sonderAbt || item.maka)}</td>
-                      <td>
-                        <span style={{ color: item.fertigungsliste === 1 ? '#586069' : '#8b949e' }}>
-                          {item.fertigungsliste === 1 ? '✓' : '✗'}
-                        </span>
-                      </td>
-                      <td>
-                        <div className="action-buttons">
-                          <button
-                            className="btn-small btn-edit"
-                            onClick={() => handleEdit(item)}
-                            disabled={operationLoading.update}
-                            title="Bearbeiten"
-                          >
-                            ✏️
-                          </button>
-                          <button
-                            className="btn-small btn-delete"
-                            onClick={() => handleDelete(item.id, item.identnr)}
-                            disabled={operationLoading.delete}
-                            title="Löschen"
-                          >
-                            🗑️
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
+                    <React.Fragment key={item.id}>
+                      <tr>
+                        {showIdentnrColumn && <td>{item.identnr}</td>}
+                        <td>
+                          <div className="merkmal-cell">
+                            <span className="merkmal-text">{item.merkmal}</span>
+                            <button
+                              className="copy-id-btn"
+                              onClick={() => copyToClipboard(item.id, 'ID')}
+                              title={`ID kopieren: ${item.id}`}
+                            >
+                              📋
+                            </button>
+                          </div>
+                        </td>
+                        <td>{item.auspraegung}</td>
+                        <td title={item.drucktext}>
+                          {item.drucktext?.length > 30 
+                            ? `${item.drucktext.substring(0, 30)}...` 
+                            : item.drucktext
+                          }
+                        </td>
+                        <td>{item.sondermerkmal || '-'}</td>
+                        <td>{item.position || '-'}</td>
+                        <td>{getSonderAbtDisplay(item.sonderAbt || item.maka)}</td>
+                        <td>
+                          <span style={{ color: item.fertigungsliste === 1 ? '#586069' : '#8b949e' }}>
+                            {item.fertigungsliste === 1 ? '✓' : '✗'}
+                          </span>
+                        </td>
+                        <td>
+                          <div className="action-buttons">
+                            <button
+                              className="btn-small btn-edit"
+                              onClick={() => handleEdit(item)}
+                              disabled={operationLoading.update}
+                              title="Bearbeiten"
+                            >
+                              {editingItem && editingItem.id === item.id ? '❌' : '✏️'}
+                            </button>
+                            <button
+                              className="btn-small btn-delete"
+                              onClick={() => handleDelete(item.id, item.identnr)}
+                              disabled={operationLoading.delete}
+                              title="Löschen"
+                            >
+                              🗑️
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                      {/* Inline-Bearbeitungsformular */}
+                      {editingItem && editingItem.id === item.id && (
+                        <tr className="inline-edit-row">
+                          <td colSpan={showIdentnrColumn ? 9 : 8}>
+                            <form onSubmit={handleInlineSubmit} className="inline-edit-form">
+                              <div className="inline-form-header">
+                                <h4>✏️ Datensatz bearbeiten: {item.identnr}</h4>
+                              </div>
+                              <div className="inline-form-grid">
+                                <div className="multi-select-container">
+                                  <div 
+                                    className="multi-select-header inline-form-input"
+                                    onClick={() => setShowIdentnrDropdown(!showIdentnrDropdown)}
+                                  >
+                                    {selectedIdentnrs.length === 0 
+                                      ? 'Ident-Nr. auswählen oder eingeben *' 
+                                      : `${selectedIdentnrs.length} Ident-Nr ausgewählt (${selectedIdentnrs.join(', ')})`
+                                    }
+                                    <span className="dropdown-arrow">{showIdentnrDropdown ? '▲' : '▼'}</span>
+                                  </div>
+                                  
+                                  {showIdentnrDropdown && (
+                                    <div className="multi-select-dropdown">
+                                      {/* Custom input field */}
+                                      <div className="custom-input-container">
+                                        <input
+                                          type="text"
+                                          placeholder="Neue Ident-Nr eingeben..."
+                                          value={customIdentnr}
+                                          onChange={(e) => setCustomIdentnr(e.target.value)}
+                                          onKeyDown={handleCustomIdentnrKeyDown}
+                                          className="custom-identnr-input"
+                                          autoFocus
+                                        />
+                                        {customIdentnr.trim() && (
+                                          <button
+                                            type="button"
+                                            onClick={handleAddCustomIdentnr}
+                                            className="add-custom-btn"
+                                            title="Hinzufügen"
+                                          >
+                                            ✓
+                                          </button>
+                                        )}
+                                      </div>
+                                      
+                                      {/* Separator if there are existing options */}
+                                      {filteredIdentnrs.length > 0 && (
+                                        <div className="dropdown-separator">
+                                          <span>Bestehende Ident-Nr auswählen:</span>
+                                        </div>
+                                      )}
+                                      
+                                      {/* Existing options */}
+                                      {filteredIdentnrs.map(identnr => (
+                                        <label key={identnr} className="multi-select-item">
+                                          <input
+                                            type="checkbox"
+                                            checked={selectedIdentnrs.includes(identnr)}
+                                            onChange={() => toggleIdentnrSelection(identnr)}
+                                            className="multi-select-checkbox"
+                                          />
+                                          <span className="multi-select-text">
+                                            {identnr}
+                                            {editingItem && originalRecord?.identnr === identnr && (
+                                              <span className="star-badge"> ⭐</span>
+                                            )}
+                                          </span>
+                                          {editingItem && originalRecord?.identnr === identnr && (
+                                            <span className="original-badge">Original</span>
+                                          )}
+                                        </label>
+                                      ))}
+                                      
+                                      {/* No results message */}
+                                      {customIdentnr.trim() && filteredIdentnrs.length === 0 && (
+                                        <div className="no-results">
+                                          <em>Keine passenden Ident-Nr gefunden</em>
+                                          <br />
+                                          <small>Enter drücken um "{customIdentnr}" hinzuzufügen</small>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                                <input
+                                  type="text"
+                                  placeholder="Merkmal *"
+                                  value={formData.merkmal}
+                                  onChange={(e) => handleInputChange('merkmal', e.target.value)}
+                                  required
+                                  className="inline-form-input"
+                                />
+                                <input
+                                  type="text"
+                                  placeholder="Ausprägung *"
+                                  value={formData.auspraegung}
+                                  onChange={(e) => handleInputChange('auspraegung', e.target.value)}
+                                  required
+                                  className="inline-form-input"
+                                />
+                                <input
+                                  type="text"
+                                  placeholder="Drucktext *"
+                                  value={formData.drucktext}
+                                  onChange={(e) => handleInputChange('drucktext', e.target.value)}
+                                  required
+                                  className="inline-form-input"
+                                />
+                                <input
+                                  type="text"
+                                  placeholder="Sondermerkmal"
+                                  value={formData.sondermerkmal}
+                                  onChange={(e) => handleInputChange('sondermerkmal', e.target.value)}
+                                  className="inline-form-input"
+                                />
+                                <input
+                                  type="number"
+                                  placeholder="Position"
+                                  value={formData.position}
+                                  onChange={(e) => handleInputChange('position', e.target.value)}
+                                  className="inline-form-input"
+                                />
+                                <select
+                                  value={formData.sonderAbt}
+                                  onChange={(e) => handleInputChange('sonderAbt', e.target.value)}
+                                  className="inline-form-input"
+                                >
+                                  <option value="0">Sonder Abt.: Keine Auswahl</option>
+                                  <option value="1">1 - schwarz</option>
+                                  <option value="2">2 - blau</option>
+                                  <option value="3">3 - rot</option>
+                                  <option value="4">4 - orange</option>
+                                  <option value="5">5 - grün</option>
+                                  <option value="6">6 - weiss</option>
+                                  <option value="7">7 - gelb</option>
+                                </select>
+                                <select
+                                  value={formData.fertigungsliste}
+                                  onChange={(e) => handleInputChange('fertigungsliste', e.target.value)}
+                                  className="inline-form-input"
+                                >
+                                  <option value="0">Fertigungsliste: Nein</option>
+                                  <option value="1">Fertigungsliste: Ja</option>
+                                </select>
+                              </div>
+                              <div className="inline-form-buttons">
+                                <button 
+                                  type="submit" 
+                                  className="btn btn-success btn-small"
+                                  disabled={operationLoading.update}
+                                >
+                                  {operationLoading.update ? '⏳ Speichert...' : '💾 Speichern'}
+                                </button>
+                                <button 
+                                  type="button" 
+                                  className="btn btn-secondary btn-small"
+                                  onClick={() => {
+                                    resetForm();
+                                  }}
+                                  disabled={operationLoading.update}
+                                >
+                                  ❌ Abbrechen
+                                </button>
+                              </div>
+                            </form>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
                   ))}
                 </tbody>
               </table>
@@ -1505,7 +1712,8 @@ export default function Home() {
           background: #f6f8fa;
           color: #586069;
           border: none;
-          transform: translateY(-1px);
+          transform: translateY(-1px) scale(1.05);
+          transition: all 0.3s ease;
         }
 
         .btn-delete {
@@ -2313,6 +2521,136 @@ export default function Home() {
 
         .App.dark-mode .remove-tag-btn:hover {
           background: #1e40af;
+        }
+
+        /* Inline-Bearbeitungsformular Stile */
+        .inline-edit-row {
+          background: var(--pastel-blue) !important;
+          border: 2px solid #6b7280;
+          animation: slideInDown 0.4s ease-out;
+          transform-origin: top;
+        }
+
+        .inline-edit-row td {
+          position: relative;
+          overflow: visible;
+        }
+
+        .inline-edit-form {
+          padding: 20px;
+          background: #ffffff;
+          border-radius: 12px;
+          margin: 10px;
+          box-shadow: var(--medium-shadow);
+          border: 1px solid #e1e4e8;
+          animation: fadeInUp 0.5s ease-out;
+          animation-fill-mode: both;
+          position: relative;
+          overflow: visible;
+        }
+
+        .inline-form-header {
+          margin-bottom: 16px;
+          text-align: center;
+        }
+
+        .inline-form-header h4 {
+          color: var(--text-primary);
+          margin: 0;
+          font-size: 1.1em;
+          font-weight: 500;
+          animation: fadeInUp 0.4s ease-out;
+          animation-fill-mode: both;
+          animation-delay: 0.1s;
+        }
+
+        .inline-form-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+          gap: 12px;
+          margin-bottom: 16px;
+        }
+
+        .inline-form-input {
+          padding: 10px 12px;
+          border: 2px solid #e1e4e8;
+          border-radius: 6px;
+          font-size: 14px;
+          transition: all 0.3s ease;
+          background: #ffffff;
+          color: var(--text-primary);
+          animation: fadeInUp 0.5s ease-out;
+          animation-fill-mode: both;
+        }
+
+        /* Sıralı animasyon gecikmesi için input alanları */
+        .inline-form-input:nth-child(1) { animation-delay: 0.1s; }
+        .inline-form-input:nth-child(2) { animation-delay: 0.15s; }
+        .inline-form-input:nth-child(3) { animation-delay: 0.2s; }
+        .inline-form-input:nth-child(4) { animation-delay: 0.25s; }
+        .inline-form-input:nth-child(5) { animation-delay: 0.3s; }
+        .inline-form-input:nth-child(6) { animation-delay: 0.35s; }
+        .inline-form-input:nth-child(7) { animation-delay: 0.4s; }
+
+        .inline-form-input:focus {
+          outline: none;
+          border-color: #a5b4fc;
+          box-shadow: 0 0 0 3px rgba(165, 180, 252, 0.1);
+        }
+
+        .inline-form-input::placeholder {
+          color: var(--text-muted);
+        }
+
+        .inline-form-buttons {
+          display: flex;
+          gap: 10px;
+          justify-content: center;
+          flex-wrap: wrap;
+          animation: fadeInUp 0.6s ease-out;
+          animation-fill-mode: both;
+          animation-delay: 0.3s;
+        }
+
+        /* Dark mode Stile für Inline-Bearbeitung */
+        .App.dark-mode .inline-edit-row {
+          background: #374151 !important;
+          border-color: #6b7280;
+        }
+
+        .App.dark-mode .inline-edit-form {
+          background: #2d2d2d;
+          border-color: #444;
+        }
+
+        .App.dark-mode .inline-form-header h4 {
+          color: #e1e4e8;
+        }
+
+        .App.dark-mode .inline-form-input {
+          background: #3a3a3a;
+          border-color: #555;
+          color: #e1e4e8;
+        }
+
+        .App.dark-mode .inline-form-input::placeholder {
+          color: #888;
+        }
+
+        .App.dark-mode .inline-form-input:focus {
+          border-color: #3b82f6;
+        }
+
+        /* Responsive Design für Inline-Form */
+        @media (max-width: 768px) {
+          .inline-form-grid {
+            grid-template-columns: 1fr;
+          }
+          
+          .inline-form-buttons {
+            flex-direction: column;
+            align-items: center;
+          }
         }
       `}</style>
     </div>
