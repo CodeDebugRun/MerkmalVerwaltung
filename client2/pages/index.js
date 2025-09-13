@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import axios from 'axios';
 import Head from 'next/head';
 import { usePagination } from '../hooks/usePagination';
@@ -50,6 +51,8 @@ export default function Home() {
   const [showFilterIdentnrDropdown, setShowFilterIdentnrDropdown] = useState(false);
   const [customFilterIdentnr, setCustomFilterIdentnr] = useState('');
   const [filteredFilterIdentnrs, setFilteredFilterIdentnrs] = useState([]);
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
+  const dropdownTriggerRef = useRef(null);
 
   // Ayarları localStorage'dan yükle - default değerler
   useEffect(() => {
@@ -718,6 +721,43 @@ export default function Home() {
   };
 
 
+  // Portal dropdown positioning hesaplama
+  const updateDropdownPosition = () => {
+    if (dropdownTriggerRef.current) {
+      const rect = dropdownTriggerRef.current.getBoundingClientRect();
+      
+      setDropdownPosition({
+        top: rect.bottom + 4, // Fixed position kullandığımız için scroll offset'e gerek yok
+        left: rect.left,
+        width: rect.width
+      });
+    }
+  };
+
+  // Dropdown açılırken pozisyon hesapla
+  const handleDropdownToggle = () => {
+    if (!showIdentnrDropdown) {
+      updateDropdownPosition();
+    }
+    setShowIdentnrDropdown(!showIdentnrDropdown);
+  };
+
+  // Scroll olduğunda dropdown'u kapat, resize'da pozisyon güncelle
+  useEffect(() => {
+    if (showIdentnrDropdown) {
+      const handleScroll = () => setShowIdentnrDropdown(false);
+      const handleResize = () => updateDropdownPosition();
+      
+      window.addEventListener('scroll', handleScroll);
+      window.addEventListener('resize', handleResize);
+      
+      return () => {
+        window.removeEventListener('scroll', handleScroll);
+        window.removeEventListener('resize', handleResize);
+      };
+    }
+  }, [showIdentnrDropdown]);
+
   return (
     <div className={`App ${darkMode ? 'dark-mode' : ''}`}>
       <Head>
@@ -765,29 +805,32 @@ export default function Home() {
               setShowForm(!showForm);
             }}
             disabled={loading || operationLoading.create || operationLoading.update}
+            title={showForm ? 'Abbrechen' : 'Neu hinzufügen'}
           >
-            {showForm ? '❌ Abbrechen' : '➕ Neu hinzufügen'}
+            {showForm ? '❌' : '➕'}
           </button>
           <button 
             className="btn btn-info" 
             onClick={() => setShowFilters(!showFilters)}
             disabled={loading}
+            title={showFilters ? 'Filter ausblenden' : 'Filter einblenden'}
           >
-            {showFilters ? '🔽 Filter ausblenden' : '🔍 Filter einblenden'}
+            {showFilters ? '🔽' : '🔍'}
           </button>
           <button 
             className="btn btn-secondary" 
             onClick={refresh}
             disabled={loading}
+            title="Aktualisieren"
           >
-            {loading ? '⏳ Lädt...' : '🔄 Aktualisieren'}
+            {loading ? '⏳' : '🔄'}
           </button>
           <button 
             className="btn btn-secondary" 
             onClick={() => setShowSettings(!showSettings)}
             title="Einstellungen"
           >
-            ⚙️ Einstellungen
+            ⚙️
           </button>
         </div>
       </header>
@@ -1329,8 +1372,9 @@ export default function Home() {
                               <div className="inline-form-grid">
                                 <div className="multi-select-container">
                                   <div 
+                                    ref={dropdownTriggerRef}
                                     className="multi-select-header inline-form-input"
-                                    onClick={() => setShowIdentnrDropdown(!showIdentnrDropdown)}
+                                    onClick={handleDropdownToggle}
                                   >
                                     {selectedIdentnrs.length === 0 
                                       ? 'Ident-Nr. auswählen oder eingeben *' 
@@ -1338,70 +1382,6 @@ export default function Home() {
                                     }
                                     <span className="dropdown-arrow">{showIdentnrDropdown ? '▲' : '▼'}</span>
                                   </div>
-                                  
-                                  {showIdentnrDropdown && (
-                                    <div className="multi-select-dropdown">
-                                      {/* Custom input field */}
-                                      <div className="custom-input-container">
-                                        <input
-                                          type="text"
-                                          placeholder="Neue Ident-Nr eingeben..."
-                                          value={customIdentnr}
-                                          onChange={(e) => setCustomIdentnr(e.target.value)}
-                                          onKeyDown={handleCustomIdentnrKeyDown}
-                                          className="custom-identnr-input"
-                                          autoFocus
-                                        />
-                                        {customIdentnr.trim() && (
-                                          <button
-                                            type="button"
-                                            onClick={handleAddCustomIdentnr}
-                                            className="add-custom-btn"
-                                            title="Hinzufügen"
-                                          >
-                                            ✓
-                                          </button>
-                                        )}
-                                      </div>
-                                      
-                                      {/* Separator if there are existing options */}
-                                      {filteredIdentnrs.length > 0 && (
-                                        <div className="dropdown-separator">
-                                          <span>Bestehende Ident-Nr auswählen:</span>
-                                        </div>
-                                      )}
-                                      
-                                      {/* Existing options */}
-                                      {filteredIdentnrs.map(identnr => (
-                                        <label key={identnr} className="multi-select-item">
-                                          <input
-                                            type="checkbox"
-                                            checked={selectedIdentnrs.includes(identnr)}
-                                            onChange={() => toggleIdentnrSelection(identnr)}
-                                            className="multi-select-checkbox"
-                                          />
-                                          <span className="multi-select-text">
-                                            {identnr}
-                                            {editingItem && originalRecord?.identnr === identnr && (
-                                              <span className="star-badge"> ⭐</span>
-                                            )}
-                                          </span>
-                                          {editingItem && originalRecord?.identnr === identnr && (
-                                            <span className="original-badge">Original</span>
-                                          )}
-                                        </label>
-                                      ))}
-                                      
-                                      {/* No results message */}
-                                      {customIdentnr.trim() && filteredIdentnrs.length === 0 && (
-                                        <div className="no-results">
-                                          <em>Keine passenden Ident-Nr gefunden</em>
-                                          <br />
-                                          <small>Enter drücken um "{customIdentnr}" hinzuzufügen</small>
-                                        </div>
-                                      )}
-                                    </div>
-                                  )}
                                 </div>
                                 <input
                                   type="text"
@@ -2641,6 +2621,22 @@ export default function Home() {
           border-color: #3b82f6;
         }
 
+        /* Portal Dropdown Özel Stile */
+        .portal-dropdown {
+          background: #ffffff;
+          border: 2px solid #3b82f6;
+          border-radius: 8px;
+          max-height: 400px;
+          overflow-y: auto;
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+          animation: fadeInUp 0.2s ease-out;
+        }
+
+        .App.dark-mode .portal-dropdown {
+          background: #2d2d2d;
+          border-color: #3b82f6;
+        }
+
         /* Responsive Design für Inline-Form */
         @media (max-width: 768px) {
           .inline-form-grid {
@@ -2651,8 +2647,88 @@ export default function Home() {
             flex-direction: column;
             align-items: center;
           }
+          
+          .portal-dropdown {
+            max-width: 90vw;
+            left: 5vw !important;
+          }
         }
       `}</style>
+
+      {/* Portal Dropdown */}
+      {showIdentnrDropdown && typeof window !== 'undefined' && createPortal(
+        <div 
+          className="multi-select-dropdown portal-dropdown"
+          style={{
+            position: 'fixed',
+            top: dropdownPosition.top,
+            left: dropdownPosition.left,
+            width: dropdownPosition.width,
+            zIndex: 999999
+          }}
+        >
+          {/* Custom input field */}
+          <div className="custom-input-container">
+            <input
+              type="text"
+              placeholder="Neue Ident-Nr eingeben..."
+              value={customIdentnr}
+              onChange={(e) => setCustomIdentnr(e.target.value)}
+              onKeyDown={handleCustomIdentnrKeyDown}
+              className="custom-identnr-input"
+              autoFocus
+            />
+            {customIdentnr.trim() && (
+              <button
+                type="button"
+                onClick={handleAddCustomIdentnr}
+                className="add-custom-btn"
+                title="Hinzufügen"
+              >
+                ✓
+              </button>
+            )}
+          </div>
+          
+          {/* Separator if there are existing options */}
+          {filteredIdentnrs.length > 0 && (
+            <div className="dropdown-separator">
+              <span>Bestehende Ident-Nr auswählen:</span>
+            </div>
+          )}
+          
+          {/* Existing options */}
+          {filteredIdentnrs.map(identnr => (
+            <label key={identnr} className="multi-select-item">
+              <input
+                type="checkbox"
+                checked={selectedIdentnrs.includes(identnr)}
+                onChange={() => toggleIdentnrSelection(identnr)}
+                className="multi-select-checkbox"
+              />
+              <span className="multi-select-text">
+                {identnr}
+                {editingItem && originalRecord?.identnr === identnr && (
+                  <span className="star-badge"> ⭐</span>
+                )}
+              </span>
+              {editingItem && originalRecord?.identnr === identnr && (
+                <span className="original-badge">Original</span>
+              )}
+            </label>
+          ))}
+          
+          {/* No results message */}
+          {customIdentnr.trim() && filteredIdentnrs.length === 0 && (
+            <div className="no-results">
+              <em>Keine passenden Ident-Nr gefunden</em>
+              <br />
+              <small>Enter drücken um "{customIdentnr}" hinzuzufügen</small>
+            </div>
+          )}
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
