@@ -360,7 +360,17 @@ export default function Home() {
       // Güncellenecek kayıtlar
       const toUpdate = currentIdentnrs.filter(identnr => originalIdentnrs.includes(identnr));
       
-      console.log('🔄 Batch-Operationen:', { zuLöschen: toDelete, hinzuzufügen: toAdd, zuAktualisieren: toUpdate });
+      // Original logic: İlk kalan kayıt yeni primary olur
+      const originalWillBeDeleted = originalRecord && toDelete.includes(originalRecord.identnr);
+      const newPrimary = currentIdentnrs.length > 0 ? currentIdentnrs[0] : null;
+      
+      console.log('🔄 Batch-Operationen:', { 
+        zuLöschen: toDelete, 
+        hinzuzufügen: toAdd, 
+        zuAktualisieren: toUpdate,
+        originalGelöscht: originalWillBeDeleted,
+        neuerPrimary: newPrimary
+      });
       
       // 1. Silme işlemleri
       for (const identnr of toDelete) {
@@ -370,19 +380,43 @@ export default function Home() {
         }
       }
       
-      // 2. Güncelleme işlemleri
-      for (const identnr of toUpdate) {
+      // 2. Güncelleme işlemleri - Primary kayıt özel işlenir
+      for (let i = 0; i < toUpdate.length; i++) {
+        const identnr = toUpdate[i];
         const recordToUpdate = similarDatasets.find(r => r.identnr === identnr && !r.isTemporary);
         if (recordToUpdate?.id && !String(recordToUpdate.id).startsWith('temp-')) {
           const dataToUpdate = { ...formData, identnr };
+          
+          // Eğer original silinmişse ve bu ilk güncellenen kayıtsa, yeni primary olur
+          if (originalWillBeDeleted && identnr === newPrimary) {
+            console.log(`🌟 ${identnr} wird zum neuen Primary-Datensatz`);
+            // Primary kayıt olarak özel işlem gerekirse buraya eklenebilir
+          }
+          
           await axios.put(`${API_BASE}/${recordToUpdate.id}`, dataToUpdate);
         }
       }
       
-      // 3. Ekleme işlemleri
-      for (const identnr of toAdd) {
+      // 3. Ekleme işlemleri - Primary kayıt özel işlenir  
+      for (let i = 0; i < toAdd.length; i++) {
+        const identnr = toAdd[i];
         const dataToAdd = { ...formData, identnr, position: '' };
+        
+        // Eğer hiç mevcut kayıt kalmamışsa, ilk eklenen primary olur
+        if (toUpdate.length === 0 && identnr === newPrimary) {
+          console.log(`🌟 ${identnr} wird zum neuen Primary-Datensatz (neu erstellt)`);
+        }
+        
         await axios.post(API_BASE, dataToAdd);
+      }
+      
+      // Local state güncelle: Yeni primary'i ayarla
+      if (originalWillBeDeleted && newPrimary) {
+        // Yeni primary'i originalRecord olarak ayarla
+        const newOriginalRecord = similarDatasets.find(r => r.identnr === newPrimary && !r.isTemporary) || 
+                                 { identnr: newPrimary, ...formData };
+        setOriginalRecord(newOriginalRecord);
+        console.log(`🔄 Original record güncellendi: ${newPrimary}`);
       }
       
       showSuccess(`✅ ${toDelete.length + toUpdate.length + toAdd.length} Operationen erfolgreich abgeschlossen`);
