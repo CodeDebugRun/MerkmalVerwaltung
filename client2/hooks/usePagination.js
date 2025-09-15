@@ -107,9 +107,80 @@ export const usePagination = (endpoint = '/merkmalstexte', initialPageSize = 50,
     fetchData(1, safePage); // Go to first page when changing page size
   }, [fetchData]);
 
-  const refresh = useCallback(() => {
-    fetchData(pagination.currentPage, pagination.pageSize, currentFilters);
+  const refresh = useCallback(async () => {
+    // Mevcut sayfa verilerini getir
+    await fetchData(pagination.currentPage, pagination.pageSize, currentFilters);
   }, [fetchData, pagination.currentPage, pagination.pageSize, currentFilters]);
+
+  const refreshWithPageAdjustment = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const params = {
+        page: Math.max(1, pagination.currentPage),
+        limit: Math.max(1, Math.min(pagination.pageSize, 1000)),
+        ...filters,
+        ...currentFilters
+      };
+
+      // Remove empty filter values
+      Object.keys(params).forEach(key => {
+        if (params[key] === '' || params[key] === null || params[key] === undefined) {
+          delete params[key];
+        }
+      });
+
+      // Check if filters are applied
+      const hasFilters = Object.keys(currentFilters).some(key =>
+        currentFilters[key] !== undefined &&
+        currentFilters[key] !== null &&
+        currentFilters[key] !== ''
+      ) || Object.keys(filters).some(key =>
+        filters[key] !== undefined &&
+        filters[key] !== null &&
+        filters[key] !== ''
+      );
+
+      const apiEndpoint = hasFilters && endpoint === '/merkmalstexte'
+        ? `${API_BASE_URL}/merkmalstexte/filter`
+        : `${API_BASE_URL}${endpoint}`;
+
+      const response = await axios.get(apiEndpoint, { params });
+
+      if (response.data && response.data.success) {
+        const { data: responseData, pagination: paginationData } = response.data.data;
+
+        // Eğer mevcut sayfa boş ve birden fazla sayfa varsa, bir önceki sayfaya git
+        if ((!responseData || responseData.length === 0) &&
+            pagination.currentPage > 1 &&
+            paginationData?.totalPages > 0) {
+
+          console.log('Current page is empty, going to previous page...');
+          const newPage = Math.min(pagination.currentPage - 1, paginationData.totalPages);
+          await fetchData(newPage, pagination.pageSize, currentFilters);
+          return;
+        }
+
+        setData(responseData || []);
+        setPagination({
+          currentPage: paginationData?.currentPage || 1,
+          totalPages: paginationData?.totalPages || 1,
+          totalCount: paginationData?.totalCount || 0,
+          pageSize: paginationData?.pageSize || pagination.pageSize,
+          hasNextPage: paginationData?.hasNextPage || false,
+          hasPreviousPage: paginationData?.hasPreviousPage || false
+        });
+      } else {
+        throw new Error(response.data?.message || 'Unknown error occurred');
+      }
+    } catch (err) {
+      console.error('Error refreshing with page adjustment:', err);
+      setError(err.response?.data?.message || err.message || 'Failed to refresh data');
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchData, pagination.currentPage, pagination.pageSize, currentFilters, filters, endpoint]);
 
   const search = useCallback((searchFilters) => {
     setCurrentFilters(searchFilters);
@@ -127,15 +198,16 @@ export const usePagination = (endpoint = '/merkmalstexte', initialPageSize = 50,
     pagination,
     loading,
     error,
-    
+
     // Actions
     goToPage,
     nextPage,
     previousPage,
     changePageSize,
     refresh,
+    refreshWithPageAdjustment,
     search,
-    
+
     // Computed values for convenience
     isEmpty: data.length === 0 && !loading,
     isFirstPage: pagination.currentPage === 1,

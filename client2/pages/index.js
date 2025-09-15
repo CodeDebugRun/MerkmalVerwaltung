@@ -91,6 +91,7 @@ export default function Home() {
     error,
     goToPage,
     refresh,
+    refreshWithPageAdjustment,
     search,
     isEmpty,
     hasData
@@ -596,7 +597,7 @@ export default function Home() {
       
       if (response.data.success) {
         showSuccess(`✅ ${response.data.message || 'Datensatz gelöscht'}`);
-        refresh(); // Daten neu laden
+        refreshWithPageAdjustment(); // Daten neu laden mit Seiten-Anpassung
       } else {
         throw new Error(response.data.message || 'Unbekannter Fehler');
       }
@@ -1741,6 +1742,13 @@ export default function Home() {
           justify-content: space-between;
           align-items: center;
           box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+          position: fixed;
+          top: 20px;
+          left: 50%;
+          transform: translateX(-50%);
+          z-index: 9999;
+          min-width: 400px;
+          max-width: 90vw;
         }
 
         .error-message {
@@ -2211,12 +2219,26 @@ export default function Home() {
           background: #1a4d3a;
           border-color: #2d7d5a;
           color: #86efac;
+          position: fixed;
+          top: 20px;
+          left: 50%;
+          transform: translateX(-50%);
+          z-index: 9999;
+          min-width: 400px;
+          max-width: 90vw;
         }
 
         .App.dark-mode .error-message {
           background: #4d1a1a;
           border-color: #7d2d2d;
           color: #fca5a5;
+          position: fixed;
+          top: 20px;
+          left: 50%;
+          transform: translateX(-50%);
+          z-index: 9999;
+          min-width: 400px;
+          max-width: 90vw;
         }
 
         .App.dark-mode .loading-container {
