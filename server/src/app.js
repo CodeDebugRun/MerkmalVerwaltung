@@ -30,6 +30,7 @@ app.use(express.json());
 
 // Routen importieren
 const merkmalstexteRoutes = require('./routes/merkmalstexteRoutes');
+const groupedRoutes = require('./routes/groupedRoutes');
 
 // Test endpoint
 app.get('/', (req, res) => {
@@ -47,8 +48,8 @@ app.get('/db-test', async (req, res) => {
 });
 
 // API-Routen mit /api Präfix verwenden
-
 app.use('/api', merkmalstexteRoutes);
+app.use('/api/grouped', groupedRoutes);
 
 // Global error handling middleware (must be last)
 app.use(errorHandler);

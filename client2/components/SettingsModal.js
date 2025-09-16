@@ -3,9 +3,7 @@ import React from 'react';
 const SettingsModal = ({
   showSettings,
   darkMode,
-  showIdentnrColumn,
   onToggleDarkMode,
-  onToggleIdentnrColumn,
   onClose
 }) => {
   if (!showSettings) {
@@ -26,19 +24,6 @@ const SettingsModal = ({
             />
             <span className="setting-text">
               {darkMode ? '🌙' : '☀️'} Dark Mode
-            </span>
-          </label>
-        </div>
-        <div className="setting-item">
-          <label className="setting-label">
-            <input
-              type="checkbox"
-              checked={showIdentnrColumn}
-              onChange={onToggleIdentnrColumn}
-              className="setting-checkbox"
-            />
-            <span className="setting-text">
-              👁️ Ident-Nr. Spalte anzeigen
             </span>
           </label>
         </div>

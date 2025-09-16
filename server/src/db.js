@@ -6,9 +6,17 @@ const config = {
   server: process.env.DB_HOST,
   database: process.env.DB_NAME,
   port: parseInt(process.env.DB_PORT),
+  connectionTimeout: 30000, // 30 seconds
+  requestTimeout: 30000, // 30 seconds
+  pool: {
+    max: 10,
+    min: 0,
+    idleTimeoutMillis: 30000
+  },
   options: {
     encrypt: true,
-    trustServerCertificate: true // Verhindert Zertifikatsfehler für localhost-Entwicklungsumgebung
+    trustServerCertificate: true, // Verhindert Zertifikatsfehler für localhost-Entwicklungsumgebung
+    enableArithAbort: true
   }
 };
 

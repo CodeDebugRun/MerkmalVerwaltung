@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 
 const MerkmalForm = ({
   showForm,
@@ -19,6 +19,22 @@ const MerkmalForm = ({
   onToggleIdentnrSelection,
   onCancel
 }) => {
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showIdentnrDropdown && !event.target.closest('.multi-select-container')) {
+        onDropdownToggle(); // This will close the dropdown
+      }
+    };
+
+    if (showIdentnrDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [showIdentnrDropdown, onDropdownToggle]);
+
   if (!showForm) {
     return null;
   }
@@ -152,7 +168,15 @@ const MerkmalForm = ({
             type="number"
             placeholder="Position"
             value={formData.position}
-            onChange={(e) => onInputChange('position', e.target.value)}
+            onChange={(e) => {
+              const value = e.target.value;
+              // Only allow positive integers
+              if (value === '' || (Number.isInteger(Number(value)) && Number(value) >= 0)) {
+                onInputChange('position', value);
+              }
+            }}
+            min="0"
+            step="1"
             className="form-input"
           />
         </div>

@@ -4,7 +4,6 @@ const MerkmalTable = ({
   data,
   loading,
   hasData,
-  showIdentnrColumn,
   sortConfig,
   editingItem,
   formData,
@@ -32,11 +31,6 @@ const MerkmalTable = ({
       <table className="data-table">
         <thead>
           <tr>
-            {showIdentnrColumn && (
-              <th className="sortable" onClick={() => onSort('identnr')}>
-                Ident-Nr. {getSortIndicator('identnr')}
-              </th>
-            )}
             <th onClick={() => onSort('merkmal')} className="sortable">
               Merkmal {getSortIndicator('merkmal')}
             </th>
@@ -65,19 +59,7 @@ const MerkmalTable = ({
           {data.map((item) => (
             <React.Fragment key={item.id}>
               <tr>
-                {showIdentnrColumn && <td>{item.identnr}</td>}
-                <td>
-                  <div className="merkmal-cell">
-                    <span className="merkmal-text">{item.merkmal}</span>
-                    <button
-                      className="copy-id-btn"
-                      onClick={() => onCopyToClipboard(item.id, 'ID')}
-                      title={`ID kopieren: ${item.id}`}
-                    >
-                      📋
-                    </button>
-                  </div>
-                </td>
+                <td>{item.merkmal}</td>
                 <td>{item.auspraegung}</td>
                 <td title={item.drucktext}>
                   {item.drucktext?.length > 30
@@ -116,19 +98,12 @@ const MerkmalTable = ({
               {/* Inline Edit Form - Simplified */}
               {editingItem && editingItem.id === item.id && (
                 <tr className="inline-edit-row">
-                  <td colSpan={showIdentnrColumn ? 9 : 8}>
+                  <td colSpan={8}>
                     <div className="inline-edit-form">
                       <div className="inline-form-header">
                         <h4>✏️ Datensatz bearbeiten: {item.identnr}</h4>
                       </div>
                       <div className="inline-form-grid">
-                        <input
-                          type="text"
-                          placeholder="Ident-Nr. *"
-                          value={formData.identnr}
-                          onChange={(e) => onInputChange('identnr', e.target.value)}
-                          className="inline-form-input"
-                        />
                         <input
                           type="text"
                           placeholder="Merkmal *"

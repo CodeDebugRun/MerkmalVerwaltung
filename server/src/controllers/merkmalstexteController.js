@@ -25,7 +25,7 @@ const getAllMerkmalstexte = async (req, res, next) => {
     
     // Extract pagination parameters with defaults and validation
     const page = Math.max(1, parseInt(req.query.page) || 1);
-    const limit = Math.max(1, Math.min(parseInt(req.query.limit) || 50, 1000)); // Max 1000 per page
+    const limit = Math.max(1, Math.min(parseInt(req.query.limit) || 25, 100)); // Max 100 per page, default 25
     const offset = (page - 1) * limit;
     
     console.log('📄 [DEBUG] Pagination parameters calculated:');
@@ -97,7 +97,8 @@ const getAllMerkmalstexte = async (req, res, next) => {
 // Funktion zum Abrufen eines einzelnen Datensatzes nach ID (READ ONE)
 const getMerkmalstextById = async (req, res, next) => {
   const { id } = req.params;
-  
+  console.log('⚡ [DEBUG] *** getMerkmalstextById CALLED with ID:', id);
+
   // Validate ID
   const idValidation = validateId(id);
   if (!idValidation.isValid) {
@@ -1144,6 +1145,124 @@ const getFilteredMerkmalstexte = async (req, res, next) => {
   }
 };
 
+// Get grouped datasets for main listing - gruplandırılmış ana liste
+const getGroupedMerkmalstexte = async (req, res, next) => {
+  console.log('🎯 [DEBUG] *** getGroupedMerkmalstexte CALLED! ***');
+  console.log('🔍 [DEBUG] getGroupedMerkmalstexte function started');
+  console.log('📥 [DEBUG] Request query parameters:', req.query);
+
+  try {
+    console.log('📊 [DEBUG] Connecting to database pool...');
+    const pool = await poolPromise;
+    console.log('✅ [DEBUG] Database pool connection successful');
+
+    // Extract pagination parameters with defaults and validation
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.max(1, Math.min(parseInt(req.query.limit) || 25, 100)); // Max 100 per page, default 25
+    const offset = (page - 1) * limit;
+
+    console.log('📄 [DEBUG] Pagination parameters calculated:');
+    console.log('   - Page:', page);
+    console.log('   - Limit:', limit);
+    console.log('   - Offset:', offset);
+
+    // Get total count for pagination metadata (grouped data count)
+    console.log('🔢 [DEBUG] Executing grouped count query...');
+    const countResult = await pool.request().query(`
+      WITH GroupedData AS (
+        SELECT
+          merkmal, auspraegung, drucktext,
+          ISNULL(sondermerkmal, '') as sondermerkmal,
+          ISNULL(merkmalsposition, 0) as merkmalsposition,
+          ISNULL(maka, 0) as maka,
+          ISNULL(fertigungsliste, 0) as fertigungsliste
+        FROM merkmalstexte
+        GROUP BY merkmal, auspraegung, drucktext, sondermerkmal, merkmalsposition, maka, fertigungsliste
+      )
+      SELECT COUNT(*) as total FROM GroupedData
+    `);
+    const totalCount = countResult.recordset[0].total;
+    const totalPages = Math.ceil(totalCount / limit);
+
+    console.log('📊 [DEBUG] Grouped count query result:');
+    console.log('   - Total grouped records:', totalCount);
+    console.log('   - Total pages:', totalPages);
+
+    // Get paginated grouped records
+    console.log('🗄️ [DEBUG] Executing main grouped data query with pagination...');
+    const result = await pool.request()
+      .input('offset', sql.Int, offset)
+      .input('limit', sql.Int, limit)
+      .query(`
+        WITH GroupedData AS (
+          SELECT
+            merkmal, auspraegung, drucktext,
+            ISNULL(sondermerkmal, '') as sondermerkmal,
+            ISNULL(merkmalsposition, 0) as merkmalsposition,
+            ISNULL(maka, 0) as maka,
+            ISNULL(fertigungsliste, 0) as fertigungsliste,
+            STRING_AGG(identnr, ',') as identnr_list,
+            STRING_AGG(CAST(id AS NVARCHAR), ',') as id_list,
+            COUNT(*) as record_count,
+            MIN(id) as first_id
+          FROM merkmalstexte
+          GROUP BY merkmal, auspraegung, drucktext, sondermerkmal, merkmalsposition, maka, fertigungsliste
+        )
+        SELECT * FROM GroupedData
+        ORDER BY merkmal, auspraegung, drucktext
+        OFFSET @offset ROWS
+        FETCH NEXT @limit ROWS ONLY
+      `);
+
+    console.log('✅ [DEBUG] Main grouped data query executed successfully');
+    console.log('📝 [DEBUG] Grouped records retrieved:', result.recordset.length);
+
+    // Map fields for frontend compatibility
+    console.log('🔄 [DEBUG] Mapping database fields to frontend fields...');
+    const recordsWithNewFields = result.recordset.map(record => ({
+      id: record.first_id, // Use first ID as primary ID for frontend
+      identnr: record.identnr_list, // All identnrs as comma-separated string (hidden in list)
+      merkmal: record.merkmal,
+      auspraegung: record.auspraegung,
+      drucktext: record.drucktext,
+      sondermerkmal: record.sondermerkmal,
+      position: record.merkmalsposition,
+      sonderAbt: record.maka,
+      fertigungsliste: record.fertigungsliste,
+      // Hidden metadata for inline edit
+      _groupData: {
+        record_count: record.record_count,
+        id_list: record.id_list,
+        identnr_list: record.identnr_list
+      }
+    }));
+
+    console.log('✅ [DEBUG] Field mapping completed');
+
+    // Return data with pagination metadata
+    console.log('📦 [DEBUG] Preparing response data with pagination metadata...');
+    const responseData = {
+      data: recordsWithNewFields,
+      pagination: {
+        currentPage: page,
+        totalPages: totalPages,
+        totalCount: totalCount,
+        pageSize: limit,
+        hasNextPage: page < totalPages,
+        hasPreviousPage: page > 1
+      }
+    };
+
+    console.log('📤 [DEBUG] Sending successful response...');
+    console.log('✅ [DEBUG] getGroupedMerkmalstexte function completed successfully');
+    res.status(200).json(formatSuccess(responseData, `Seite ${page} von ${totalPages} erfolgreich abgerufen (gruplandırılmış)`));
+  } catch (err) {
+    console.log('❌ [DEBUG] Error in getGroupedMerkmalstexte:', err.message);
+    console.log('🔍 [DEBUG] Error details:', err);
+    next(err);
+  }
+};
+
 // Aynı datensatz'a ait tüm kayıtları getir (merkmal, auspraegung, drucktext aynı olanlar)
 const getSimilarDatasets = async (req, res) => {
   const { id } = req.params;
@@ -1208,6 +1327,93 @@ const getSimilarDatasets = async (req, res) => {
   }
 };
 
+// Update grouped records - updates all records in the group
+const updateGroupedMerkmalstexte = async (req, res, next) => {
+  try {
+    const {
+      originalData,  // Original group data to identify which records to update
+      newData,       // New data to update with
+      identnrs       // Array of identnrs that should be in this group
+    } = req.body;
+
+    console.log('🔄 [DEBUG] updateGroupedMerkmalstexte called');
+    console.log('Original data:', originalData);
+    console.log('New data:', newData);
+    console.log('Identnrs:', identnrs);
+
+    const pool = await poolPromise;
+
+    // Start a transaction
+    const transaction = pool.transaction();
+    await transaction.begin();
+
+    try {
+      // First, delete all existing records for this group
+      await transaction.request()
+        .input('merkmal', sql.NVarChar, originalData.merkmal)
+        .input('auspraegung', sql.NVarChar, originalData.auspraegung)
+        .input('drucktext', sql.NVarChar, originalData.drucktext)
+        .input('sondermerkmal', sql.NVarChar, originalData.sondermerkmal || '')
+        .input('position', sql.Int, originalData.position)
+        .input('sonderAbt', sql.Int, originalData.sonderAbt)
+        .input('fertigungsliste', sql.Int, originalData.fertigungsliste)
+        .query(`
+          DELETE FROM VarTextKZTable
+          WHERE merkmal = @merkmal
+            AND auspraegung = @auspraegung
+            AND drucktext = @drucktext
+            AND ISNULL(sondermerkmal, '') = @sondermerkmal
+            AND merkmalsposition = @position
+            AND maka = @sonderAbt
+            AND fertigungsliste = @fertigungsliste
+        `);
+
+      // Then insert new records for each identnr
+      for (const identnr of identnrs) {
+        await transaction.request()
+          .input('identnr', sql.NVarChar, identnr)
+          .input('merkmal', sql.NVarChar, newData.merkmal)
+          .input('auspraegung', sql.NVarChar, newData.auspraegung)
+          .input('drucktext', sql.NVarChar, newData.drucktext)
+          .input('sondermerkmal', sql.NVarChar, newData.sondermerkmal || '')
+          .input('position', sql.Int, newData.position || 0)
+          .input('sonderAbt', sql.Int, newData.sonderAbt || 0)
+          .input('fertigungsliste', sql.Int, newData.fertigungsliste || 0)
+          .query(`
+            INSERT INTO VarTextKZTable (
+              identnr, merkmal, auspraegung, drucktext,
+              sondermerkmal, merkmalsposition, maka, fertigungsliste
+            ) VALUES (
+              @identnr, @merkmal, @auspraegung, @drucktext,
+              @sondermerkmal, @position, @sonderAbt, @fertigungsliste
+            )
+          `);
+      }
+
+      await transaction.commit();
+
+      res.json({
+        success: true,
+        message: `${identnrs.length} Datensätze erfolgreich aktualisiert`,
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (innerErr) {
+      await transaction.rollback();
+      throw innerErr;
+    }
+
+  } catch (err) {
+    console.error('❌ [ERROR] updateGroupedMerkmalstexte error:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Fehler beim Aktualisieren der Gruppendaten',
+      error: err.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+};
+
 module.exports = {
   getAllMerkmalstexte,
   getMerkmalstextById,
@@ -1217,6 +1423,8 @@ module.exports = {
   deleteMerkmalstext,
   bulkUpdateMerkmalstextePositions,
   getFilteredMerkmalstexte,
+  getGroupedMerkmalstexte,
+  updateGroupedMerkmalstexte,
   checkNullIds,
   checkDuplicateIdentnrs,
   getMerkmalstexteByIdentnr,

@@ -10,6 +10,7 @@ export default function Home() {
   const [merkmalstexte, setMerkmalstexte] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [totalRecords, setTotalRecords] = useState(0);
 
   // Core state
   const [editingItem, setEditingItem] = useState(null);
@@ -60,7 +61,7 @@ export default function Home() {
   const [selectedFilterIdentnrs, setSelectedFilterIdentnrs] = useState([]);
   const [showFilterIdentnrDropdown, setShowFilterIdentnrDropdown] = useState(false);
   const [customFilterIdentnr, setCustomFilterIdentnr] = useState('');
-  const [allIdentnrs, setAllIdentnrs] = useState(['TEST001', 'TEST002', 'TEST003']); // Mock data
+  const [allIdentnrs, setAllIdentnrs] = useState([]); // Will load from API
 
   // API Base
   const API_BASE = 'http://localhost:3001/api/merkmalstexte';
@@ -108,12 +109,13 @@ export default function Home() {
       setLoading(true);
       setError('');
 
-      // Try real API first
-      const response = await fetch(`${API_BASE}?limit=100`);
+      // Try real API first - use grouped endpoint
+      const response = await fetch(`http://localhost:3001/api/grouped/merkmalstexte?page=1&pageSize=100`);
       const data = await response.json();
 
       if (data.success) {
-        setMerkmalstexte(data.data.data || []);
+        setMerkmalstexte(data.data || []);
+        setTotalRecords(data.pagination?.totalRecords || 0);
       } else {
         // Fallback to mock data
         console.warn('API failed, using mock data');
@@ -147,9 +149,28 @@ export default function Home() {
     });
   }, [merkmalstexte, sortConfig]);
 
+  // Fetch all identnrs from API
+  const fetchAllIdentnrs = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/list/identnrs`);
+      const data = await response.json();
+
+      if (data.success) {
+        setAllIdentnrs(data.data || []);
+      } else {
+        console.warn('Failed to fetch identnrs, using empty array');
+        setAllIdentnrs([]);
+      }
+    } catch (err) {
+      console.warn('Error fetching identnrs:', err.message);
+      setAllIdentnrs([]);
+    }
+  };
+
   // Initialize data and settings
   useEffect(() => {
     fetchMerkmalstexte();
+    fetchAllIdentnrs();
 
     // Load saved settings from localStorage
     const savedDarkMode = localStorage.getItem('darkMode');
@@ -304,13 +325,51 @@ export default function Home() {
     setSelectedFilterIdentnrs([]);
   };
 
-  const handleFilterSearch = () => {
-    console.log('Filter search:', { filterData, selectedFilterIdentnrs });
-    // For now, just show success message
-    showSuccess('🔍 Filter angewendet (Demo)');
+  const handleFilterSearch = async () => {
+    try {
+      setLoading(true);
+      setError('');
+
+      // Build query parameters
+      const params = new URLSearchParams();
+
+      // Add filter parameters
+      if (filterData.merkmal) params.append('merkmal', filterData.merkmal);
+      if (filterData.auspraegung) params.append('auspraegung', filterData.auspraegung);
+      if (filterData.drucktext) params.append('drucktext', filterData.drucktext);
+      if (filterData.sondermerkmal) params.append('sondermerkmal', filterData.sondermerkmal);
+      if (filterData.position) params.append('position', filterData.position);
+      if (filterData.sonderAbt) params.append('sonderAbt', filterData.sonderAbt);
+      if (filterData.fertigungsliste) params.append('fertigungsliste', filterData.fertigungsliste);
+
+      // Add selected Ident-Nr if any
+      if (selectedFilterIdentnrs.length > 0) {
+        params.append('identnr', selectedFilterIdentnrs[0]); // Only one allowed
+      }
+
+      params.append('limit', '100'); // Default limit
+
+      const response = await fetch(`${API_BASE}/filter?${params.toString()}`);
+      const data = await response.json();
+
+      if (data.success) {
+        setMerkmalstexte(data.data.data || []);
+        const count = data.data.pagination?.totalCount || 0;
+        setTotalRecords(count);
+        showSuccess(`🔍 ${count} Datensätze gefunden`);
+      } else {
+        setError('Filter-Suche fehlgeschlagen');
+      }
+    } catch (err) {
+      console.error('Filter error:', err);
+      setError('Fehler beim Filtern der Daten');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleClearFilters = () => {
+    // Clear all filter states
     setFilterData({
       identnr: '',
       merkmal: '',
@@ -323,7 +382,10 @@ export default function Home() {
     });
     setSelectedFilterIdentnrs([]);
     setCustomFilterIdentnr('');
-    showSuccess('🗑️ Filter gelöscht');
+
+    // Reload all data
+    fetchMerkmalstexte();
+    showSuccess('🗑️ Filter gelöscht - Alle Daten geladen');
   };
 
   // Computed filter values
@@ -355,12 +417,60 @@ export default function Home() {
     setShowForm(true);
   };
 
-  const handleFormSubmit = (e) => {
+  const handleFormSubmit = async (e) => {
     e.preventDefault();
-    console.log('Form submit:', { formData, selectedIdentnrs });
-    showSuccess('📝 Formular eingereicht (Demo)');
-    setShowForm(false);
-    resetForm();
+
+    // Validation
+    if (!formData.merkmal || !formData.auspraegung || !formData.drucktext || selectedIdentnrs.length === 0) {
+      alert('Bitte füllen Sie alle Pflichtfelder aus: Ident-Nr., Merkmal, Ausprägung und Drucktext');
+      return;
+    }
+
+    try {
+      setOperationLoading(prev => ({ ...prev, create: true }));
+
+      // Create record for each selected Ident-Nr
+      for (const identnr of selectedIdentnrs) {
+        const response = await fetch(`${API_BASE}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            identnr: identnr,
+            merkmal: formData.merkmal,
+            auspraegung: formData.auspraegung,
+            drucktext: formData.drucktext,
+            sondermerkmal: formData.sondermerkmal || '',
+            position: formData.position || '',
+            sonderAbt: formData.sonderAbt || '0',
+            fertigungsliste: formData.fertigungsliste || '0'
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to create record for ${identnr}`);
+        }
+      }
+
+      // Success
+      const count = selectedIdentnrs.length;
+      const identnrList = selectedIdentnrs.join(', ');
+      showSuccess(`✅ ${count} Datensatz${count > 1 ? 'e' : ''} erfolgreich erstellt für: ${identnrList}`);
+
+      setShowForm(false);
+      resetForm();
+      setSelectedIdentnrs([]);
+      setCustomIdentnr('');
+
+      // Refresh data
+      await fetchMerkmalstexte();
+
+    } catch (err) {
+      handleApiError(err, 'Fehler beim Erstellen der Datensätze');
+    } finally {
+      setOperationLoading(prev => ({ ...prev, create: false }));
+    }
   };
 
   const handleFormCancel = () => {
@@ -401,13 +511,12 @@ export default function Home() {
     }
   };
 
-  // Computed form values
+  // Computed form values - show all identnrs, selected ones will be checked
   const filteredIdentnrs = customIdentnr
     ? allIdentnrs.filter(identnr =>
-        identnr.toLowerCase().includes(customIdentnr.toLowerCase()) &&
-        !selectedIdentnrs.includes(identnr)
+        identnr.toLowerCase().includes(customIdentnr.toLowerCase())
       )
-    : allIdentnrs.filter(identnr => !selectedIdentnrs.includes(identnr));
+    : allIdentnrs;
 
   return (
     <div className="container">
@@ -418,16 +527,15 @@ export default function Home() {
       </Head>
 
       <header className="app-header">
-        <h1>📋 Merkmalstexte Verwaltung</h1>
+        <h1>Merkmalstexte Verwaltung</h1>
         <div className="header-controls">
           <div className="action-buttons">
             <button
-              className="btn btn-info"
-              onClick={fetchMerkmalstexte}
-              disabled={loading}
-              title="Daten aktualisieren"
+              className="btn btn-success"
+              onClick={handleShowCreateForm}
+              title="Neuen Datensatz erstellen"
             >
-              🔄 {loading ? 'Lädt...' : 'Aktualisieren'}
+              ➕
             </button>
 
             <button
@@ -435,7 +543,16 @@ export default function Home() {
               onClick={() => setShowFilters(!showFilters)}
               title="Filter Panel"
             >
-              🔍 {showFilters ? 'Filter verbergen' : 'Filter anzeigen'}
+              🔍
+            </button>
+
+            <button
+              className="btn btn-info"
+              onClick={fetchMerkmalstexte}
+              disabled={loading}
+              title="Daten aktualisieren"
+            >
+              🔄
             </button>
 
             <button
@@ -443,15 +560,7 @@ export default function Home() {
               onClick={() => setShowSettings(!showSettings)}
               title="Einstellungen"
             >
-              ⚙️ {showSettings ? 'Einstellungen verbergen' : 'Einstellungen'}
-            </button>
-
-            <button
-              className="btn btn-success"
-              onClick={handleShowCreateForm}
-              title="Neuen Datensatz erstellen"
-            >
-              ➕ {showForm ? 'Form verbergen' : 'Neu erstellen'}
+              ⚙️
             </button>
 
           </div>
@@ -494,9 +603,7 @@ export default function Home() {
         <SettingsModal
           showSettings={showSettings}
           darkMode={darkMode}
-          showIdentnrColumn={false}
           onToggleDarkMode={handleToggleDarkMode}
-          onToggleIdentnrColumn={() => {}}
           onClose={handleCloseSettings}
         />
 
@@ -522,11 +629,11 @@ export default function Home() {
 
         <section className="data-section">
           <div className="data-header">
-            <h3>📋 Datensätze</h3>
+            <h3>Datensätze</h3>
             {!loading && (
               <p className="data-info">
                 {hasData
-                  ? `${merkmalstexte.length} Datensätze gefunden`
+                  ? `${totalRecords.toLocaleString()} Datensätze (${merkmalstexte.length} angezeigt)`
                   : 'Keine Daten verfügbar'
                 }
               </p>
@@ -550,7 +657,6 @@ export default function Home() {
             data={sortedMerkmalstexte}
             loading={loading}
             hasData={hasData}
-            showIdentnrColumn={false}
             sortConfig={sortConfig}
             editingItem={editingItem}
             formData={formData}
