@@ -7,12 +7,14 @@ const MerkmalTable = ({
   sortConfig,
   editingItem,
   formData,
+  columnFilters,
   onSort,
   onEdit,
   onDelete,
   onCopyToClipboard,
   onInputChange,
   onResetForm,
+  onColumnFilterChange,
   getSonderAbtDisplay
 }) => {
   if (!hasData || loading) {
@@ -53,6 +55,170 @@ const MerkmalTable = ({
               Fertigungsliste {getSortIndicator('fertigungsliste')}
             </th>
             <th>Aktionen</th>
+          </tr>
+          {/* Column Filter Row */}
+          <tr>
+            <th>
+              <input
+                type="text"
+                placeholder="Filter Merkmal..."
+                value={columnFilters.merkmal}
+                onChange={(e) => onColumnFilterChange('merkmal', e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && onColumnFilterChange('apply', 'all')}
+                style={{
+                  width: '100%',
+                  padding: '4px',
+                  fontSize: '12px',
+                  border: '1px solid #ddd',
+                  borderRadius: '3px'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              />
+            </th>
+            <th>
+              <input
+                type="text"
+                placeholder="Filter Ausprägung..."
+                value={columnFilters.auspraegung}
+                onChange={(e) => onColumnFilterChange('auspraegung', e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && onColumnFilterChange('apply', 'all')}
+                style={{
+                  width: '100%',
+                  padding: '4px',
+                  fontSize: '12px',
+                  border: '1px solid #ddd',
+                  borderRadius: '3px'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              />
+            </th>
+            <th>
+              <input
+                type="text"
+                placeholder="Filter Drucktext..."
+                value={columnFilters.drucktext}
+                onChange={(e) => onColumnFilterChange('drucktext', e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && onColumnFilterChange('apply', 'all')}
+                style={{
+                  width: '100%',
+                  padding: '4px',
+                  fontSize: '12px',
+                  border: '1px solid #ddd',
+                  borderRadius: '3px'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              />
+            </th>
+            <th>
+              <input
+                type="text"
+                placeholder="Filter Sondermerkmal..."
+                value={columnFilters.sondermerkmal}
+                onChange={(e) => onColumnFilterChange('sondermerkmal', e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && onColumnFilterChange('apply', 'all')}
+                style={{
+                  width: '100%',
+                  padding: '4px',
+                  fontSize: '12px',
+                  border: '1px solid #ddd',
+                  borderRadius: '3px'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              />
+            </th>
+            <th>
+              <input
+                type="text"
+                placeholder="Filter Position..."
+                value={columnFilters.position}
+                onChange={(e) => onColumnFilterChange('position', e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && onColumnFilterChange('apply', 'all')}
+                style={{
+                  width: '100%',
+                  padding: '4px',
+                  fontSize: '12px',
+                  border: '1px solid #ddd',
+                  borderRadius: '3px'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              />
+            </th>
+            <th>
+              <select
+                value={columnFilters.sonderAbt}
+                onChange={(e) => onColumnFilterChange('sonderAbt', e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '4px',
+                  fontSize: '12px',
+                  border: '1px solid #ddd',
+                  borderRadius: '3px'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <option value="">Alle Sonder-Abt</option>
+                <option value="0">Keine</option>
+                <option value="1">1 - schwarz</option>
+                <option value="2">2 - blau</option>
+                <option value="3">3 - rot</option>
+                <option value="4">4 - orange</option>
+                <option value="5">5 - grün</option>
+                <option value="6">6 - weiss</option>
+                <option value="7">7 - gelb</option>
+              </select>
+            </th>
+            <th>
+              <select
+                value={columnFilters.fertigungsliste}
+                onChange={(e) => onColumnFilterChange('fertigungsliste', e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '4px',
+                  fontSize: '12px',
+                  border: '1px solid #ddd',
+                  borderRadius: '3px'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <option value="">Alle</option>
+                <option value="0">Nein (✗)</option>
+                <option value="1">Ja (✓)</option>
+              </select>
+            </th>
+            <th>
+              <div style={{display: 'flex', gap: '4px', justifyContent: 'center'}}>
+                <button
+                  onClick={() => onColumnFilterChange && onColumnFilterChange('apply', 'all')}
+                  style={{
+                    padding: '4px 8px',
+                    fontSize: '12px',
+                    border: '1px solid #007bff',
+                    backgroundColor: '#007bff',
+                    color: '#fff',
+                    borderRadius: '3px',
+                    cursor: 'pointer'
+                  }}
+                  title="Filter anwenden"
+                >
+                  🔍
+                </button>
+                <button
+                  onClick={() => onColumnFilterChange && onColumnFilterChange('clear', 'all')}
+                  style={{
+                    padding: '4px 8px',
+                    fontSize: '12px',
+                    border: '1px solid #6c757d',
+                    backgroundColor: '#6c757d',
+                    color: '#fff',
+                    borderRadius: '3px',
+                    cursor: 'pointer'
+                  }}
+                  title="Filter zurücksetzen"
+                >
+                  🔄
+                </button>
+              </div>
+            </th>
           </tr>
         </thead>
         <tbody>

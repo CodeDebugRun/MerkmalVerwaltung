@@ -20,6 +20,33 @@ export default function Home() {
     delete: false
   });
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageInput, setPageInput] = useState('');
+  const recordsPerPage = 50;
+
+  // Column filters state (for quick filtering in table headers)
+  const [columnFilters, setColumnFilters] = useState({
+    merkmal: '',
+    auspraegung: '',
+    drucktext: '',
+    sondermerkmal: '',
+    position: '',
+    sonderAbt: '',
+    fertigungsliste: ''
+  });
+
+  // Applied column filters (actually used for filtering)
+  const [appliedColumnFilters, setAppliedColumnFilters] = useState({
+    merkmal: '',
+    auspraegung: '',
+    drucktext: '',
+    sondermerkmal: '',
+    position: '',
+    sonderAbt: '',
+    fertigungsliste: ''
+  });
+
   // Form state - sadece inline edit için
   const [formData, setFormData] = useState({
     identnr: '',
@@ -110,12 +137,13 @@ export default function Home() {
       setError('');
 
       // Try real API first - use grouped endpoint
-      const response = await fetch(`http://localhost:3001/api/grouped/merkmalstexte?page=1&pageSize=100`);
+      const response = await fetch(`http://localhost:3001/api/grouped/merkmalstexte`);
       const data = await response.json();
 
+
       if (data.success) {
-        setMerkmalstexte(data.data || []);
-        setTotalRecords(data.pagination?.totalRecords || 0);
+        setMerkmalstexte(data.data.data || []);
+        setTotalRecords(data.data.totalCount || 0);
       } else {
         // Fallback to mock data
         console.warn('API failed, using mock data');
@@ -134,10 +162,38 @@ export default function Home() {
 
   // Computed values
   const hasData = merkmalstexte && merkmalstexte.length > 0;
-  const sortedMerkmalstexte = React.useMemo(() => {
-    if (!merkmalstexte || !sortConfig.key) return merkmalstexte;
 
-    return [...merkmalstexte].sort((a, b) => {
+  // Apply column filters first
+  const filteredMerkmalstexte = React.useMemo(() => {
+    if (!merkmalstexte) return [];
+
+    return merkmalstexte.filter(item => {
+      return Object.entries(appliedColumnFilters).every(([field, filterValue]) => {
+        if (!filterValue) return true; // No filter applied for this field
+
+        // Special handling for sonderAbt and fertigungsliste - exact match
+        if (field === 'sonderAbt') {
+          const itemSonderAbt = (item.sonderAbt || item.maka)?.toString();
+          return itemSonderAbt === filterValue;
+        }
+
+        if (field === 'fertigungsliste') {
+          const itemFertigungsliste = item.fertigungsliste?.toString();
+          return itemFertigungsliste === filterValue;
+        }
+
+        // Text search for other fields
+        const itemValue = item[field]?.toString().toLowerCase() || '';
+        return itemValue.includes(filterValue.toLowerCase());
+      });
+    });
+  }, [merkmalstexte, appliedColumnFilters]);
+
+  // Then apply sorting
+  const sortedMerkmalstexte = React.useMemo(() => {
+    if (!filteredMerkmalstexte || !sortConfig.key) return filteredMerkmalstexte;
+
+    return [...filteredMerkmalstexte].sort((a, b) => {
       const aVal = a[sortConfig.key] || '';
       const bVal = b[sortConfig.key] || '';
 
@@ -147,7 +203,16 @@ export default function Home() {
         return bVal.toString().localeCompare(aVal.toString());
       }
     });
-  }, [merkmalstexte, sortConfig]);
+  }, [filteredMerkmalstexte, sortConfig]);
+
+  // Pagination logic (based on filtered data)
+  const filteredTotalRecords = sortedMerkmalstexte?.length || 0;
+  const totalPages = Math.ceil(filteredTotalRecords / recordsPerPage);
+  const currentData = React.useMemo(() => {
+    const startIndex = (currentPage - 1) * recordsPerPage;
+    const endIndex = startIndex + recordsPerPage;
+    return sortedMerkmalstexte?.slice(startIndex, endIndex) || [];
+  }, [sortedMerkmalstexte, currentPage, recordsPerPage]);
 
   // Fetch all identnrs from API
   const fetchAllIdentnrs = async () => {
@@ -243,6 +308,115 @@ export default function Home() {
       key,
       direction: prevConfig.key === key && prevConfig.direction === 'asc' ? 'desc' : 'asc'
     }));
+  };
+
+  // Pagination handlers
+  const handlePageChange = (newPage) => {
+    if (newPage >= 1 && newPage <= totalPages) {
+      setCurrentPage(newPage);
+    }
+  };
+
+  const handlePreviousPage = () => {
+    handlePageChange(currentPage - 1);
+  };
+
+  const handleNextPage = () => {
+    handlePageChange(currentPage + 1);
+  };
+
+  // Generate pagination numbers with ellipsis
+  const getPaginationNumbers = () => {
+    const numbers = [];
+    const delta = 2; // How many pages to show around current page
+
+    if (totalPages <= 7) {
+      // Show all pages if total is small
+      for (let i = 1; i <= totalPages; i++) {
+        numbers.push(i);
+      }
+    } else {
+      // Always show first page
+      numbers.push(1);
+
+      if (currentPage > delta + 2) {
+        numbers.push('...');
+      }
+
+      // Show pages around current page
+      const start = Math.max(2, currentPage - delta);
+      const end = Math.min(totalPages - 1, currentPage + delta);
+
+      for (let i = start; i <= end; i++) {
+        numbers.push(i);
+      }
+
+      if (currentPage < totalPages - delta - 1) {
+        numbers.push('...');
+      }
+
+      // Always show last page
+      if (totalPages > 1) {
+        numbers.push(totalPages);
+      }
+    }
+
+    return numbers;
+  };
+
+  // Handle page input
+  const handlePageInputChange = (value) => {
+    setPageInput(value);
+  };
+
+  const handlePageInputSubmit = (e) => {
+    e.preventDefault();
+    const pageNum = parseInt(pageInput);
+    if (pageNum >= 1 && pageNum <= totalPages) {
+      handlePageChange(pageNum);
+      setPageInput('');
+    } else {
+      alert(`Bitte geben Sie eine Seitenzahl zwischen 1 und ${totalPages} ein.`);
+    }
+  };
+
+  const handlePageInputKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      handlePageInputSubmit(e);
+    }
+  };
+
+  // Column filter handlers
+  const handleColumnFilterChange = (field, value) => {
+    if (field === 'apply') {
+      // Apply filters - copy current inputs to applied filters
+      setAppliedColumnFilters({ ...columnFilters });
+      setCurrentPage(1);
+    } else if (field === 'clear') {
+      // Clear all filters
+      setColumnFilters({
+        merkmal: '',
+        auspraegung: '',
+        drucktext: '',
+        sondermerkmal: '',
+        position: '',
+        sonderAbt: '',
+        fertigungsliste: ''
+      });
+      setAppliedColumnFilters({
+        merkmal: '',
+        auspraegung: '',
+        drucktext: '',
+        sondermerkmal: '',
+        position: '',
+        sonderAbt: '',
+        fertigungsliste: ''
+      });
+      setCurrentPage(1);
+    } else {
+      // Just update input values, don't apply filtering yet
+      setColumnFilters(prev => ({ ...prev, [field]: value }));
+    }
   };
 
   const handleEdit = (item) => {
@@ -654,22 +828,136 @@ export default function Home() {
           )}
 
           <MerkmalTable
-            data={sortedMerkmalstexte}
+            data={currentData}
             loading={loading}
             hasData={hasData}
             sortConfig={sortConfig}
             editingItem={editingItem}
             formData={formData}
+            columnFilters={columnFilters}
             onSort={handleSort}
             onEdit={handleEdit}
             onDelete={handleDelete}
             onCopyToClipboard={copyToClipboard}
             onInputChange={handleInputChange}
             onResetForm={resetForm}
+            onColumnFilterChange={handleColumnFilterChange}
             getSonderAbtDisplay={getSonderAbtDisplay}
           />
 
-{/* Pagination removed to fix loop issues */}
+          {/* Data Info */}
+          {hasData && (
+            <div style={{textAlign: 'center', margin: '15px 0', padding: '10px', backgroundColor: '#f8f9fa', borderRadius: '5px'}}>
+              <p style={{margin: 0, color: '#666'}}>
+                Zeige {((currentPage - 1) * recordsPerPage) + 1}-{Math.min(currentPage * recordsPerPage, filteredTotalRecords)} von {filteredTotalRecords.toLocaleString()} gefilterten Datensätzen
+                {filteredTotalRecords !== totalRecords && ` (${totalRecords.toLocaleString()} gesamt)`}
+                ({recordsPerPage} pro Seite)
+              </p>
+            </div>
+          )}
+
+          {/* Pagination Controls */}
+          {hasData && totalPages > 1 && (
+            <div style={{display: 'flex', justifyContent: 'center', alignItems: 'center', margin: '20px 0'}}>
+              <div style={{display: 'flex', alignItems: 'center', gap: '5px'}}>
+                {/* Previous Arrow */}
+                <button
+                  onClick={handlePreviousPage}
+                  disabled={currentPage === 1}
+                  style={{
+                    padding: '8px 12px',
+                    border: '1px solid #ddd',
+                    backgroundColor: currentPage === 1 ? '#f5f5f5' : '#fff',
+                    color: currentPage === 1 ? '#ccc' : '#333',
+                    cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                    borderRadius: '4px'
+                  }}
+                  title="Vorherige Seite"
+                >
+                  ◀️
+                </button>
+
+                {/* Page Numbers */}
+                {getPaginationNumbers().map((pageNum, index) => (
+                  pageNum === '...' ? (
+                    <span key={`ellipsis-${index}`} style={{padding: '8px 4px', color: '#666'}}>...</span>
+                  ) : (
+                    <button
+                      key={pageNum}
+                      onClick={() => handlePageChange(pageNum)}
+                      style={{
+                        padding: '8px 12px',
+                        border: '1px solid #ddd',
+                        backgroundColor: pageNum === currentPage ? '#007bff' : '#fff',
+                        color: pageNum === currentPage ? '#fff' : '#333',
+                        cursor: 'pointer',
+                        borderRadius: '4px',
+                        fontWeight: pageNum === currentPage ? 'bold' : 'normal'
+                      }}
+                      title={`Seite ${pageNum}`}
+                    >
+                      {pageNum}
+                    </button>
+                  )
+                ))}
+
+                {/* Next Arrow */}
+                <button
+                  onClick={handleNextPage}
+                  disabled={currentPage === totalPages}
+                  style={{
+                    padding: '8px 12px',
+                    border: '1px solid #ddd',
+                    backgroundColor: currentPage === totalPages ? '#f5f5f5' : '#fff',
+                    color: currentPage === totalPages ? '#ccc' : '#333',
+                    cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                    borderRadius: '4px'
+                  }}
+                  title="Nächste Seite"
+                >
+                  ▶️
+                </button>
+
+                {/* Page Input */}
+                <div style={{marginLeft: '20px', display: 'flex', alignItems: 'center', gap: '8px'}}>
+                  <span style={{fontSize: '14px', color: '#666'}}>Gehe zu Seite:</span>
+                  <input
+                    type="number"
+                    min="1"
+                    max={totalPages}
+                    value={pageInput}
+                    onChange={(e) => handlePageInputChange(e.target.value)}
+                    onKeyPress={handlePageInputKeyPress}
+                    placeholder={currentPage.toString()}
+                    style={{
+                      width: '60px',
+                      padding: '6px 8px',
+                      border: '1px solid #ddd',
+                      borderRadius: '4px',
+                      textAlign: 'center',
+                      fontSize: '14px'
+                    }}
+                    title={`Seitenzahl eingeben (1-${totalPages})`}
+                  />
+                  <button
+                    onClick={handlePageInputSubmit}
+                    style={{
+                      padding: '6px 12px',
+                      border: '1px solid #007bff',
+                      backgroundColor: '#007bff',
+                      color: '#fff',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '14px'
+                    }}
+                    title="Zur Seite gehen"
+                  >
+                    →
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </section>
       </main>
     </div>

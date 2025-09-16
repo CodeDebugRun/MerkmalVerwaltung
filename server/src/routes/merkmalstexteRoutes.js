@@ -27,8 +27,8 @@ router.get('/merkmalstexte/list/identnrs', controller.getAllIdentnrs);
 // POST: Add new custom Ident-Nr to database
 router.post('/merkmalstexte/add-identnr', controller.addCustomIdentnr);
 
-// Bu route sonra eklenecek - şimdilik yorum olarak kalsın
-// router.post('/merkmalstexte/:id/copy-to-identnrs', controller.copyRecordToMultipleIdentnrs);
+// POST: Copy record to multiple Ident-Nr values
+router.post('/merkmalstexte/:id/copy-to-identnrs', controller.copyRecordToMultipleIdentnrs);
 
 // GET: All records by Ident-Nr
 router.get('/merkmalstexte/identnr/:identnr', controller.getMerkmalstexteByIdentnr);
@@ -45,15 +45,19 @@ router.post('/merkmalstexte', controller.createMerkmalstext);
 // POST: Bulk position update - Legacy merkmalsposition_edit.jsp functionality
 router.post('/merkmalstexte/bulk-position', controller.bulkUpdateMerkmalstextePositions);
 
-// Bu route'lar sonra eklenecek - şimdilik yorum olarak kalsın
-// router.put('/merkmalstexte/:id', controller.updateMerkmalstext);
-// router.patch('/merkmalstexte/:id', controller.patchMerkmalstext);
-// router.delete('/merkmalstexte/:id', controller.deleteMerkmalstext);
+// PUT: Update specific record (full update)
+router.put('/merkmalstexte/:id', controller.updateMerkmalstext);
 
-// Bu route sonra eklenecek - şimdilik yorum olarak kalsın
-// router.get('/merkmalstexte/:id', controller.getMerkmalstextById);
+// PATCH: Partial update specific record
+router.patch('/merkmalstexte/:id', controller.patchMerkmalstext);
 
-// Bu route sonra eklenecek - şimdilik yorum olarak kalsın
-// router.get('/merkmalstexte/:id/similar', controller.getSimilarDatasets);
+// DELETE: Delete specific record
+router.delete('/merkmalstexte/:id', controller.deleteMerkmalstext);
+
+// GET: Get specific record by ID
+router.get('/merkmalstexte/:id', controller.getMerkmalstextById);
+
+// GET: Get similar datasets to a specific record
+router.get('/merkmalstexte/:id/similar', controller.getSimilarDatasets);
 
 module.exports = router;

@@ -1156,15 +1156,8 @@ const getGroupedMerkmalstexte = async (req, res, next) => {
     const pool = await poolPromise;
     console.log('✅ [DEBUG] Database pool connection successful');
 
-    // Extract pagination parameters with defaults and validation
-    const page = Math.max(1, parseInt(req.query.page) || 1);
-    const limit = Math.max(1, Math.min(parseInt(req.query.limit) || 25, 100)); // Max 100 per page, default 25
-    const offset = (page - 1) * limit;
-
-    console.log('📄 [DEBUG] Pagination parameters calculated:');
-    console.log('   - Page:', page);
-    console.log('   - Limit:', limit);
-    console.log('   - Offset:', offset);
+    // No backend pagination - return all grouped records
+    console.log('📄 [DEBUG] Fetching all grouped records without pagination...');
 
     // Get total count for pagination metadata (grouped data count)
     console.log('🔢 [DEBUG] Executing grouped count query...');
@@ -1182,17 +1175,13 @@ const getGroupedMerkmalstexte = async (req, res, next) => {
       SELECT COUNT(*) as total FROM GroupedData
     `);
     const totalCount = countResult.recordset[0].total;
-    const totalPages = Math.ceil(totalCount / limit);
 
     console.log('📊 [DEBUG] Grouped count query result:');
     console.log('   - Total grouped records:', totalCount);
-    console.log('   - Total pages:', totalPages);
 
-    // Get paginated grouped records
-    console.log('🗄️ [DEBUG] Executing main grouped data query with pagination...');
+    // Get all grouped records without pagination
+    console.log('🗄️ [DEBUG] Executing main grouped data query...');
     const result = await pool.request()
-      .input('offset', sql.Int, offset)
-      .input('limit', sql.Int, limit)
       .query(`
         WITH GroupedData AS (
           SELECT
@@ -1210,8 +1199,6 @@ const getGroupedMerkmalstexte = async (req, res, next) => {
         )
         SELECT * FROM GroupedData
         ORDER BY merkmal, auspraegung, drucktext
-        OFFSET @offset ROWS
-        FETCH NEXT @limit ROWS ONLY
       `);
 
     console.log('✅ [DEBUG] Main grouped data query executed successfully');
@@ -1240,22 +1227,15 @@ const getGroupedMerkmalstexte = async (req, res, next) => {
     console.log('✅ [DEBUG] Field mapping completed');
 
     // Return data with pagination metadata
-    console.log('📦 [DEBUG] Preparing response data with pagination metadata...');
+    console.log('📦 [DEBUG] Preparing response data...');
     const responseData = {
       data: recordsWithNewFields,
-      pagination: {
-        currentPage: page,
-        totalPages: totalPages,
-        totalCount: totalCount,
-        pageSize: limit,
-        hasNextPage: page < totalPages,
-        hasPreviousPage: page > 1
-      }
+      totalCount: totalCount
     };
 
     console.log('📤 [DEBUG] Sending successful response...');
     console.log('✅ [DEBUG] getGroupedMerkmalstexte function completed successfully');
-    res.status(200).json(formatSuccess(responseData, `Seite ${page} von ${totalPages} erfolgreich abgerufen (gruplandırılmış)`));
+    res.status(200).json(formatSuccess(responseData, `${totalCount} gruplandırılmış kayıt erfolgreich abgerufen`));
   } catch (err) {
     console.log('❌ [DEBUG] Error in getGroupedMerkmalstexte:', err.message);
     console.log('🔍 [DEBUG] Error details:', err);
