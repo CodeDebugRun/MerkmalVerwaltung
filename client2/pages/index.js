@@ -4,8 +4,12 @@ import MerkmalTable from '../components/MerkmalTable';
 import FilterPanel from '../components/FilterPanel';
 import SettingsModal from '../components/SettingsModal';
 import MerkmalForm from '../components/MerkmalForm';
+import { useDarkMode } from '../hooks/useDarkMode';
 
 export default function Home() {
+  // Dark mode hook
+  const { isDarkMode, toggleDarkMode } = useDarkMode();
+
   // Data state
   const [merkmalstexte, setMerkmalstexte] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -65,13 +69,17 @@ export default function Home() {
 
   // Settings state
   const [showSettings, setShowSettings] = useState(false);
-  const [darkMode, setDarkMode] = useState(false);
 
   // Form state
   const [showForm, setShowForm] = useState(false);
   const [selectedIdentnrs, setSelectedIdentnrs] = useState([]);
   const [showIdentnrDropdown, setShowIdentnrDropdown] = useState(false);
   const [customIdentnr, setCustomIdentnr] = useState('');
+
+  // Inline edit state
+  const [selectedInlineIdentnrs, setSelectedInlineIdentnrs] = useState([]);
+  const [showInlineDropdown, setShowInlineDropdown] = useState(false);
+  const [customInlineIdentnr, setCustomInlineIdentnr] = useState('');
 
   // Filter state
   const [showFilters, setShowFilters] = useState(false);
@@ -237,11 +245,7 @@ export default function Home() {
     fetchMerkmalstexte();
     fetchAllIdentnrs();
 
-    // Load saved settings from localStorage
-    const savedDarkMode = localStorage.getItem('darkMode');
-    if (savedDarkMode) {
-      setDarkMode(JSON.parse(savedDarkMode));
-    }
+    // Dark mode is handled by the useDarkMode hook
   }, []);
 
   // Auto-hide success message
@@ -273,6 +277,9 @@ export default function Home() {
       fertigungsliste: '0'
     });
     setEditingItem(null);
+    setSelectedInlineIdentnrs([]);
+    setShowInlineDropdown(false);
+    setCustomInlineIdentnr('');
   };
 
   const getSonderAbtDisplay = (value) => {
@@ -436,6 +443,14 @@ export default function Home() {
       sonderAbt: item.sonderAbt?.toString() || '0',
       fertigungsliste: item.fertigungsliste?.toString() || '0'
     });
+
+    // Set selected identnrs for this group from _groupData
+    if (item._groupData && item._groupData.identnr_list) {
+      const identnrs = item._groupData.identnr_list.split(',').map(id => id.trim());
+      setSelectedInlineIdentnrs(identnrs);
+    } else {
+      setSelectedInlineIdentnrs([]);
+    }
   };
 
   const handleDelete = async (id, identnr) => {
@@ -462,15 +477,153 @@ export default function Home() {
     }
   };
 
-  // Dummy handlers for inline edit (will be implemented later)
-  const handleInlineSubmit = (e) => {
-    e.preventDefault();
-    console.log('Inline submit - will implement later');
-    resetForm();
+  // Inline edit handlers
+  const handleInlineDropdownToggle = () => {
+    setShowInlineDropdown(!showInlineDropdown);
   };
 
-  const handleInlineDropdownToggle = () => {
-    console.log('Inline dropdown toggle - will implement later');
+  const handleCustomInlineIdentnrChange = (value) => {
+    setCustomInlineIdentnr(value);
+  };
+
+  const handleAddCustomInlineIdentnr = () => {
+    const newIdentnr = customInlineIdentnr.trim();
+    if (newIdentnr && !selectedInlineIdentnrs.includes(newIdentnr)) {
+      setSelectedInlineIdentnrs([...selectedInlineIdentnrs, newIdentnr]);
+      setCustomInlineIdentnr('');
+    }
+  };
+
+  const handleToggleInlineIdentnrSelection = (identnr) => {
+    if (selectedInlineIdentnrs.includes(identnr)) {
+      setSelectedInlineIdentnrs(selectedInlineIdentnrs.filter(id => id !== identnr));
+    } else {
+      setSelectedInlineIdentnrs([...selectedInlineIdentnrs, identnr]);
+    }
+  };
+
+  const handleUpdateRecord = async () => {
+    if (!editingItem) return;
+
+    try {
+      setOperationLoading(prev => ({ ...prev, update: true }));
+
+      // Get original identnrs from group data
+      const originalIdentnrs = editingItem._groupData?.identnr_list
+        ? editingItem._groupData.identnr_list.split(',').map(id => id.trim())
+        : [];
+
+      const currentIdentnrs = selectedInlineIdentnrs;
+
+      // Find identnrs to add (selected but not in original)
+      const identnrsToAdd = currentIdentnrs.filter(id => !originalIdentnrs.includes(id));
+
+      // Find identnrs to remove (in original but not selected)
+      const identnrsToRemove = originalIdentnrs.filter(id => !currentIdentnrs.includes(id));
+
+      // Find identnrs to update (in both lists)
+      const identnrsToUpdate = currentIdentnrs.filter(id => originalIdentnrs.includes(id));
+
+      console.log('🔄 Bulk operations plan:');
+      console.log('➕ Add identnrs:', identnrsToAdd);
+      console.log('🗑️ Remove identnrs:', identnrsToRemove);
+      console.log('✏️ Update identnrs:', identnrsToUpdate);
+
+      // 1. Create new records for added identnrs
+      // Use the same position as the existing group to ensure they stay grouped together
+      const groupPosition = editingItem.position; // Use original group's position
+
+      for (const identnr of identnrsToAdd) {
+        console.log(`➕ Creating record for identnr: ${identnr} with position: ${groupPosition}`);
+
+        const createResponse = await fetch(`${API_BASE}/identnr/${identnr}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            merkmal: formData.merkmal,
+            auspraegung: formData.auspraegung,
+            drucktext: formData.drucktext,
+            sondermerkmal: formData.sondermerkmal || '',
+            position: groupPosition || null, // Use group's position, not form's position
+            sonderAbt: parseInt(formData.sonderAbt) || 0,
+            fertigungsliste: parseInt(formData.fertigungsliste) || 0
+          })
+        });
+
+        if (!createResponse.ok) {
+          throw new Error(`Failed to create record for identnr: ${identnr}`);
+        }
+      }
+
+      // 2. Delete records for removed identnrs
+      for (const identnr of identnrsToRemove) {
+        const deleteResponse = await fetch(`${API_BASE}/identnr/${identnr}`, {
+          method: 'DELETE'
+        });
+
+        if (!deleteResponse.ok) {
+          throw new Error(`Failed to delete records for identnr: ${identnr}`);
+        }
+      }
+
+      // 3. Update existing records (bulk update all records with same merkmal/auspraegung/drucktext)
+      if (identnrsToUpdate.length > 0) {
+        // Use the getSimilarDatasets endpoint to get all related records
+        const similarResponse = await fetch(`${API_BASE}/${editingItem.id}/similar`);
+        if (similarResponse.ok) {
+          const similarData = await similarResponse.json();
+          console.log('📊 Similar data response:', similarData);
+
+          if (similarData.success && similarData.data) {
+            // Ensure data is an array
+            const records = Array.isArray(similarData.data) ? similarData.data : [similarData.data];
+            console.log('📊 Records to process:', records);
+
+            // Update each related record
+            for (const record of records) {
+              // Only update if the identnr is in the selected list
+              if (identnrsToUpdate.includes(record.identnr)) {
+                console.log(`🔄 Updating record ID ${record.id} for identnr ${record.identnr}`);
+
+                const updateResponse = await fetch(`${API_BASE}/${record.id}`, {
+                  method: 'PUT',
+                  headers: {
+                    'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify({
+                    merkmal: formData.merkmal,
+                    auspraegung: formData.auspraegung,
+                    drucktext: formData.drucktext,
+                    sondermerkmal: formData.sondermerkmal || '',
+                    position: formData.position ? parseInt(formData.position) : null,
+                    sonderAbt: parseInt(formData.sonderAbt) || 0,
+                    fertigungsliste: parseInt(formData.fertigungsliste) || 0
+                  })
+                });
+
+                if (!updateResponse.ok) {
+                  throw new Error(`Failed to update record ID: ${record.id}`);
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // Success message
+      const totalOps = identnrsToAdd.length + identnrsToRemove.length + identnrsToUpdate.length;
+      showSuccess(`✅ Bulk operation erfolgreich: ${identnrsToAdd.length} hinzugefügt, ${identnrsToRemove.length} gelöscht, ${identnrsToUpdate.length} aktualisiert`);
+
+      resetForm();
+      await fetchMerkmalstexte(); // Refresh data
+
+    } catch (err) {
+      handleApiError(err, 'Fehler bei Bulk-Operation');
+    } finally {
+      setOperationLoading(prev => ({ ...prev, update: false }));
+    }
   };
 
   // Filter handlers
@@ -571,10 +724,8 @@ export default function Home() {
 
   // Settings handlers
   const handleToggleDarkMode = () => {
-    const newDarkMode = !darkMode;
-    setDarkMode(newDarkMode);
-    localStorage.setItem('darkMode', JSON.stringify(newDarkMode));
-    showSuccess(newDarkMode ? '🌙 Dark Mode aktiviert' : '☀️ Light Mode aktiviert');
+    toggleDarkMode();
+    showSuccess(isDarkMode ? '☀️ Light Mode aktiviert' : '🌙 Dark Mode aktiviert');
   };
 
 
@@ -776,7 +927,7 @@ export default function Home() {
 
         <SettingsModal
           showSettings={showSettings}
-          darkMode={darkMode}
+          darkMode={isDarkMode}
           onToggleDarkMode={handleToggleDarkMode}
           onClose={handleCloseSettings}
         />
@@ -835,6 +986,11 @@ export default function Home() {
             editingItem={editingItem}
             formData={formData}
             columnFilters={columnFilters}
+            selectedIdentnrs={selectedInlineIdentnrs}
+            showInlineDropdown={showInlineDropdown}
+            allIdentnrs={allIdentnrs}
+            customIdentnr={customInlineIdentnr}
+            operationLoading={operationLoading}
             onSort={handleSort}
             onEdit={handleEdit}
             onDelete={handleDelete}
@@ -842,6 +998,11 @@ export default function Home() {
             onInputChange={handleInputChange}
             onResetForm={resetForm}
             onColumnFilterChange={handleColumnFilterChange}
+            onInlineDropdownToggle={handleInlineDropdownToggle}
+            onCustomIdentnrChange={handleCustomInlineIdentnrChange}
+            onToggleIdentnrSelection={handleToggleInlineIdentnrSelection}
+            onAddCustomIdentnr={handleAddCustomInlineIdentnr}
+            onUpdateRecord={handleUpdateRecord}
             getSonderAbtDisplay={getSonderAbtDisplay}
           />
 
