@@ -1216,7 +1216,7 @@ const updateGroupedMerkmalstexte = async (req, res, next) => {
         .input('sonderAbt', sql.Int, originalData.sonderAbt)
         .input('fertigungsliste', sql.Int, originalData.fertigungsliste)
         .query(`
-          DELETE FROM VarTextKZTable
+          DELETE FROM merkmalstexte
           WHERE merkmal = @merkmal
             AND auspraegung = @auspraegung
             AND drucktext = @drucktext
@@ -1238,7 +1238,7 @@ const updateGroupedMerkmalstexte = async (req, res, next) => {
           .input('sonderAbt', sql.Int, newData.sonderAbt || 0)
           .input('fertigungsliste', sql.Int, newData.fertigungsliste || 0)
           .query(`
-            INSERT INTO VarTextKZTable (
+            INSERT INTO merkmalstexte (
               identnr, merkmal, auspraegung, drucktext,
               sondermerkmal, merkmalsposition, maka, fertigungsliste
             ) VALUES (
