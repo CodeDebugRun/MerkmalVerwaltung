@@ -1221,6 +1221,7 @@ export default function Home() {
             allIdentnrs={allIdentnrs}
             customIdentnr={customInlineIdentnr}
             operationLoading={operationLoading}
+            showIdentnrColumn={currentData?.length > 0 && !currentData[0]?._groupData}
             onSort={handleSort}
             onEdit={handleEdit}
             onDelete={handleDelete}

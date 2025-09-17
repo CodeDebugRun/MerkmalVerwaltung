@@ -13,6 +13,7 @@ const MerkmalTable = ({
   allIdentnrs,
   customIdentnr,
   operationLoading,
+  showIdentnrColumn = false,
   onSort,
   onEdit,
   onDelete,
@@ -43,6 +44,11 @@ const MerkmalTable = ({
       <table className="data-table">
         <thead>
           <tr>
+            {showIdentnrColumn && (
+              <th onClick={() => onSort('identnr')} className="sortable">
+                Ident-Nr {getSortIndicator('identnr')}
+              </th>
+            )}
             <th onClick={() => onSort('merkmal')} className="sortable">
               Merkmal {getSortIndicator('merkmal')}
             </th>
@@ -68,6 +74,25 @@ const MerkmalTable = ({
           </tr>
           {/* Column Filter Row */}
           <tr>
+            {showIdentnrColumn && (
+              <th>
+                <input
+                  type="text"
+                  placeholder="Filter Ident-Nr..."
+                  value={columnFilters.identnr || ''}
+                  onChange={(e) => onColumnFilterChange('identnr', e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && onColumnFilterChange('apply', 'all')}
+                  style={{
+                    width: '100%',
+                    padding: '4px',
+                    fontSize: '12px',
+                    border: '1px solid #ddd',
+                    borderRadius: '3px'
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </th>
+            )}
             <th>
               <input
                 type="text"
@@ -219,6 +244,9 @@ const MerkmalTable = ({
           {data.map((item) => (
             <React.Fragment key={item.id}>
               <tr>
+                {showIdentnrColumn && (
+                  <td>{item.identnr}</td>
+                )}
                 <td>{item.merkmal}</td>
                 <td>{item.auspraegung}</td>
                 <td title={item.drucktext}>
@@ -258,7 +286,7 @@ const MerkmalTable = ({
               {/* Inline Edit Form - Simplified */}
               {editingItem && editingItem.id === item.id && (
                 <tr className="inline-edit-row">
-                  <td colSpan={8}>
+                  <td colSpan={showIdentnrColumn ? 9 : 8}>
                     <div className="inline-edit-form">
                       <div className="inline-form-header">
                         <h4>✏️ Datensatz bearbeiten: {(() => {
