@@ -557,11 +557,13 @@ export default function Home() {
   const handleDelete = async (item) => {
     const { id, identnr, merkmal, auspraegung, drucktext } = item;
     const recordCount = item._groupData?.record_count || 1;
-    const identnrList = item._groupData?.identnr_list || identnr;
+    // Remove duplicates from identnr list for display
+    const rawIdentnrList = item._groupData?.identnr_list || identnr;
+    const identnrList = rawIdentnrList.split(',').map(id => id.trim()).filter((id, index, arr) => arr.indexOf(id) === index).join(',');
 
     console.log('🗑️ Delete operation started:', {
       id,
-      identnr,
+      identnr: identnrList, // Use cleaned identnr list
       merkmal,
       auspraegung,
       drucktext,
