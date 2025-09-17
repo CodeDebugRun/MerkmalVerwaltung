@@ -246,7 +246,7 @@ const MerkmalTable = ({
                     </button>
                     <button
                       className="btn-small btn-delete"
-                      onClick={() => onDelete(item.id, item.identnr)}
+                      onClick={() => onDelete(item)}
                       title="Löschen"
                     >
                       🗑️

@@ -54,6 +54,9 @@ router.patch('/merkmalstexte/:id', controller.patchMerkmalstext);
 // DELETE: Delete specific record
 router.delete('/merkmalstexte/:id', controller.deleteMerkmalstext);
 
+// POST: Bulk delete by group data
+router.post('/merkmalstexte/bulk-delete-group', controller.bulkDeleteByGroupData);
+
 // GET: Get specific record by ID
 router.get('/merkmalstexte/:id', controller.getMerkmalstextById);
 

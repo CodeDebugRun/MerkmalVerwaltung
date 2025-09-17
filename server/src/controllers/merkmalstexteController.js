@@ -1433,6 +1433,97 @@ const updateGroupedMerkmalstexte = async (req, res, next) => {
   }
 };
 
+// Bulk delete by group data - delete all records with same merkmal/auspraegung/drucktext
+const bulkDeleteByGroupData = async (req, res, next) => {
+  console.log('🗑️ [DEBUG] bulkDeleteByGroupData function started');
+  console.log('📥 [DEBUG] Request body:', req.body);
+
+  const { merkmal, auspraegung, drucktext, sondermerkmal, position, sonderAbt, fertigungsliste } = req.body;
+
+  // Validate required fields
+  if (!merkmal || !auspraegung || !drucktext) {
+    return res.status(400).json(formatValidationError(['Merkmal, Ausprägung und Drucktext sind erforderlich']));
+  }
+
+  try {
+    console.log('📊 [DEBUG] Connecting to database pool...');
+    const pool = await poolPromise;
+    console.log('✅ [DEBUG] Database pool connection successful');
+
+    const result = await withTransaction(pool, async (transaction) => {
+      const request = createRequest(transaction);
+
+      // Build WHERE clause for group matching
+      const whereConditions = ['merkmal = @merkmal', 'auspraegung = @auspraegung', 'drucktext = @drucktext'];
+
+      request.input('merkmal', sql.VarChar, merkmal)
+             .input('auspraegung', sql.VarChar, auspraegung)
+             .input('drucktext', sql.VarChar, drucktext);
+
+      // Add optional fields to WHERE clause if provided
+      if (sondermerkmal !== undefined) {
+        whereConditions.push('ISNULL(sondermerkmal, \'\') = @sondermerkmal');
+        request.input('sondermerkmal', sql.VarChar, sondermerkmal || '');
+      }
+
+      if (position !== undefined) {
+        whereConditions.push('ISNULL(merkmalsposition, 0) = @position');
+        request.input('position', sql.Int, parseInt(position) || 0);
+      }
+
+      if (sonderAbt !== undefined) {
+        whereConditions.push('ISNULL(maka, 0) = @sonderAbt');
+        request.input('sonderAbt', sql.Int, parseInt(sonderAbt) || 0);
+      }
+
+      if (fertigungsliste !== undefined) {
+        whereConditions.push('ISNULL(fertigungsliste, 0) = @fertigungsliste');
+        request.input('fertigungsliste', sql.Int, parseInt(fertigungsliste) || 0);
+      }
+
+      const whereClause = whereConditions.join(' AND ');
+
+      // First, get count of records to be deleted
+      const countQuery = `SELECT COUNT(*) as count FROM merkmalstexte WHERE ${whereClause}`;
+      const countResult = await request.query(countQuery);
+      const recordCount = countResult.recordset[0].count;
+
+      console.log(`🔍 [DEBUG] Found ${recordCount} records matching group criteria`);
+
+      if (recordCount === 0) {
+        return { deletedCount: 0, message: 'Keine passenden Datensätze gefunden' };
+      }
+
+      // Delete all matching records
+      const deleteQuery = `DELETE FROM merkmalstexte WHERE ${whereClause}`;
+      const deleteResult = await request.query(deleteQuery);
+      const deletedCount = deleteResult.rowsAffected[0];
+
+      console.log(`✅ [DEBUG] Successfully deleted ${deletedCount} records`);
+
+      return { deletedCount, recordCount };
+    });
+
+    const { deletedCount, message } = result;
+
+    if (message) {
+      return res.status(404).json(formatError(message));
+    }
+
+    console.log('📤 [DEBUG] Sending successful response...');
+    console.log('✅ [DEBUG] bulkDeleteByGroupData function completed successfully');
+
+    res.status(200).json(formatSuccess(
+      { deletedCount },
+      `${deletedCount} Datensätze der Gruppe erfolgreich gelöscht`
+    ));
+  } catch (err) {
+    console.log('❌ [DEBUG] Error in bulkDeleteByGroupData:', err.message);
+    console.log('🔍 [DEBUG] Error details:', err);
+    next(err);
+  }
+};
+
 module.exports = {
   getAllMerkmalstexte,
   getMerkmalstextById,
@@ -1453,5 +1544,6 @@ module.exports = {
   getAllIdentnrs,
   addCustomIdentnr,
   copyRecordToMultipleIdentnrs,
-  getSimilarDatasets
+  getSimilarDatasets,
+  bulkDeleteByGroupData
 };

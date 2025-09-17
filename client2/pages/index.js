@@ -436,8 +436,49 @@ export default function Home() {
   const handleColumnFilterChange = (field, value) => {
     if (field === 'apply') {
       // Apply filters - copy current inputs to applied filters
-      setAppliedColumnFilters({ ...columnFilters });
+      const newFilters = { ...columnFilters };
+      setAppliedColumnFilters(newFilters);
       setCurrentPage(1);
+
+      // Log filter results to console
+      console.log('🔍 Column Filter Applied:', newFilters);
+
+      // Use setTimeout to log results after state update
+      setTimeout(() => {
+        const currentPageData = filteredMerkmalstexte.slice(
+          (currentPage - 1) * recordsPerPage,
+          currentPage * recordsPerPage
+        );
+
+        console.log('📊 Filter Results:', {
+          totalRecords: merkmalstexte.length,
+          filteredRecords: filteredMerkmalstexte.length,
+          currentPage: currentPage,
+          recordsPerPage: recordsPerPage,
+          currentPageGroups: currentPageData.length
+        });
+
+        console.log('👥 Group Details:', {
+          groupCount: filteredMerkmalstexte.length,
+          currentPageGroups: currentPageData.map(group => ({
+            id: group.id,
+            merkmal: group.merkmal,
+            auspraegung: group.auspraegung,
+            drucktext: group.drucktext,
+            sondermerkmal: group.sondermerkmal,
+            position: group.position,
+            recordCount: group._groupData?.record_count || 1,
+            identnrList: group._groupData?.identnr_list || group.identnr,
+            idList: group._groupData?.id_list
+          })),
+          allFilteredGroups: filteredMerkmalstexte.map(group => ({
+            merkmal: group.merkmal,
+            auspraegung: group.auspraegung,
+            recordCount: group._groupData?.record_count || 1
+          }))
+        });
+      }, 0);
+
     } else if (field === 'clear') {
       // Clear all filters
       setColumnFilters({
@@ -459,6 +500,9 @@ export default function Home() {
         fertigungsliste: ''
       });
       setCurrentPage(1);
+
+      console.log('🗑️ Column Filters Cleared - Showing all records:', merkmalstexte.length);
+
     } else {
       // Just update input values, don't apply filtering yet
       setColumnFilters(prev => ({ ...prev, [field]: value }));
@@ -492,22 +536,73 @@ export default function Home() {
     }
   };
 
-  const handleDelete = async (id, identnr) => {
-    if (!window.confirm(`Möchten Sie den Datensatz mit der ID ${id} (Ident-Nr: ${identnr}) wirklich löschen?`)) {
+  const handleDelete = async (item) => {
+    const { id, identnr, merkmal, auspraegung, drucktext } = item;
+    const recordCount = item._groupData?.record_count || 1;
+    const identnrList = item._groupData?.identnr_list || identnr;
+
+    console.log('🗑️ Delete operation started:', {
+      id,
+      identnr,
+      merkmal,
+      auspraegung,
+      drucktext,
+      recordCount,
+      identnrList
+    });
+
+    const confirmMessage = recordCount > 1
+      ? `Möchten Sie die gesamte Gruppe "${merkmal} - ${auspraegung}" mit ${recordCount} Datensätzen (Ident-Nr: ${identnrList}) wirklich löschen?`
+      : `Möchten Sie den Datensatz "${merkmal} - ${auspraegung}" (Ident-Nr: ${identnr}) wirklich löschen?`;
+
+    if (!window.confirm(confirmMessage)) {
       return;
     }
 
     try {
       setOperationLoading(prev => ({ ...prev, delete: true }));
-      const response = await fetch(`${API_BASE}/${id}`, {
-        method: 'DELETE'
-      });
 
-      if (!response.ok) {
-        throw new Error('Delete failed');
+      let response;
+
+      if (recordCount === 1) {
+        // Single record delete - use individual endpoint
+        response = await fetch(`${API_BASE}/${id}`, {
+          method: 'DELETE'
+        });
+      } else {
+        // Multiple records delete - use bulk endpoint
+        response = await fetch(`${API_BASE}/bulk-delete-group`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            merkmal: item.merkmal,
+            auspraegung: item.auspraegung,
+            drucktext: item.drucktext,
+            sondermerkmal: item.sondermerkmal,
+            position: item.position,
+            sonderAbt: item.sonderAbt,
+            fertigungsliste: item.fertigungsliste
+          })
+        });
       }
 
-      showSuccess(`✅ Datensatz ${id} erfolgreich gelöscht`);
+      if (!response.ok) {
+        const errorData = await response.text();
+        console.error('Delete failed:', response.status, errorData);
+        throw new Error(`Delete failed: ${response.status} - ${errorData}`);
+      }
+
+      const result = await response.json();
+      const deletedCount = result.data?.deletedCount || recordCount;
+
+      if (recordCount === 1) {
+        showSuccess(`✅ Datensatz erfolgreich gelöscht`);
+      } else {
+        showSuccess(`✅ ${deletedCount} Datensätze der Gruppe erfolgreich gelöscht`);
+      }
+
       await fetchMerkmalstexte(); // Refresh data
     } catch (err) {
       handleApiError(err, 'Fehler beim Löschen');
@@ -572,27 +667,22 @@ export default function Home() {
       // Use the same position as the existing group to ensure they stay grouped together
       const groupPosition = editingItem.position; // Use original group's position
 
-      for (const identnr of identnrsToAdd) {
-        console.log(`➕ Creating record for identnr: ${identnr} with position: ${groupPosition}`);
+      // Use bulk copy endpoint to ensure same position for all identnrs
+      if (identnrsToAdd.length > 0) {
+        console.log(`➕ Creating records for identnrs: ${identnrsToAdd.join(', ')} using bulk copy`);
 
-        const createResponse = await fetch(`${API_BASE}/identnr/${identnr}`, {
+        const copyResponse = await fetch(`${API_BASE}/${editingItem.id}/copy-to-identnrs`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            merkmal: formData.merkmal,
-            auspraegung: formData.auspraegung,
-            drucktext: formData.drucktext,
-            sondermerkmal: formData.sondermerkmal || '',
-            position: groupPosition || null, // Use group's position, not form's position
-            sonderAbt: parseInt(formData.sonderAbt) || 0,
-            fertigungsliste: parseInt(formData.fertigungsliste) || 0
+            identnrs: [...originalIdentnrs, ...identnrsToAdd] // Include both original and new identnrs
           })
         });
 
-        if (!createResponse.ok) {
-          throw new Error(`Failed to create record for identnr: ${identnr}`);
+        if (!copyResponse.ok) {
+          throw new Error(`Failed to copy record to new identnrs`);
         }
       }
 
@@ -793,27 +883,48 @@ export default function Home() {
     try {
       setOperationLoading(prev => ({ ...prev, create: true }));
 
-      // Create record for each selected Ident-Nr
-      for (const identnr of selectedIdentnrs) {
-        const response = await fetch(`${API_BASE}`, {
+      // Create record for first identnr, then copy to others to ensure same position
+      const [firstIdentnr, ...otherIdentnrs] = selectedIdentnrs;
+
+      // Create the first record
+      const firstResponse = await fetch(`${API_BASE}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          identnr: firstIdentnr,
+          merkmal: formData.merkmal,
+          auspraegung: formData.auspraegung,
+          drucktext: formData.drucktext,
+          sondermerkmal: formData.sondermerkmal || '',
+          position: formData.position || '',
+          sonderAbt: formData.sonderAbt || '0',
+          fertigungsliste: formData.fertigungsliste || '0'
+        })
+      });
+
+      if (!firstResponse.ok) {
+        throw new Error(`Failed to create record for ${firstIdentnr}`);
+      }
+
+      // If there are other identnrs, copy the first record to them
+      if (otherIdentnrs.length > 0) {
+        const firstRecord = await firstResponse.json();
+        const recordId = firstRecord.data.id;
+
+        const copyResponse = await fetch(`${API_BASE}/${recordId}/copy-to-identnrs`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            identnr: identnr,
-            merkmal: formData.merkmal,
-            auspraegung: formData.auspraegung,
-            drucktext: formData.drucktext,
-            sondermerkmal: formData.sondermerkmal || '',
-            position: formData.position || '',
-            sonderAbt: formData.sonderAbt || '0',
-            fertigungsliste: formData.fertigungsliste || '0'
+            identnrs: selectedIdentnrs // All identnrs including the first one
           })
         });
 
-        if (!response.ok) {
-          throw new Error(`Failed to create record for ${identnr}`);
+        if (!copyResponse.ok) {
+          throw new Error(`Failed to copy record to other identnrs`);
         }
       }
 
@@ -1003,7 +1114,7 @@ export default function Home() {
             {!loading && (
               <p className="data-info">
                 {hasData
-                  ? `${totalRecords.toLocaleString()} Datensätze (${merkmalstexte.length} angezeigt)`
+                  ? `${filteredTotalRecords.toLocaleString()} Datensätze (${currentData.length} angezeigt)${filteredTotalRecords !== totalRecords ? ` von ${totalRecords.toLocaleString()} gesamt` : ''}`
                   : 'Keine Daten verfügbar'
                 }
               </p>
