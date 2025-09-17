@@ -296,9 +296,16 @@ const MerkmalTable = ({
                             itemIdentnr: item.identnr,
                             groupData: item._groupData
                           });
-                          // Remove duplicates and clean up
-                          const cleanList = identnrList.split(',').map(id => id.trim()).filter((id, index, arr) => arr.indexOf(id) === index).join(',');
-                          return cleanList;
+                          // Remove duplicates, clean up, and sort
+                          const cleanAndSortedList = identnrList.split(',')
+                            .map(id => id.trim())
+                            .filter((id, index, arr) => arr.indexOf(id) === index)
+                            .sort((a, b) => {
+                              // Natural sort for alphanumeric identnrs (T0001, T0002, etc.)
+                              return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+                            })
+                            .join(',');
+                          return cleanAndSortedList;
                         })()}</h4>
                       </div>
                       <div className="inline-form-grid">

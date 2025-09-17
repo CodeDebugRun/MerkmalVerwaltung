@@ -15,36 +15,21 @@ const {
 
 // Funktion zum Abrufen aller Datensätze (READ ALL) - mit Pagination-Unterstützung
 const getAllMerkmalstexte = async (req, res, next) => {
-  console.log('🔍 [DEBUG] getAllMerkmalstexte function started');
-  console.log('📥 [DEBUG] Request query parameters:', req.query);
-  
   try {
-    console.log('📊 [DEBUG] Connecting to database pool...');
     const pool = await poolPromise;
-    console.log('✅ [DEBUG] Database pool connection successful');
     
     // Extract pagination parameters with defaults and validation
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.max(1, Math.min(parseInt(req.query.limit) || 25, 100)); // Max 100 per page, default 25
     const offset = (page - 1) * limit;
     
-    console.log('📄 [DEBUG] Pagination parameters calculated:');
-    console.log('   - Page:', page);
-    console.log('   - Limit:', limit);
-    console.log('   - Offset:', offset);
     
     // Get total count for pagination metadata
-    console.log('🔢 [DEBUG] Executing count query...');
     const countResult = await pool.request().query('SELECT COUNT(*) as total FROM merkmalstexte');
     const totalCount = countResult.recordset[0].total;
     const totalPages = Math.ceil(totalCount / limit);
     
-    console.log('📊 [DEBUG] Count query result:');
-    console.log('   - Total records:', totalCount);
-    console.log('   - Total pages:', totalPages);
-    
     // Get paginated records with proper ordering
-    console.log('🗄️ [DEBUG] Executing main data query with pagination...');
     const result = await pool.request()
       .input('offset', sql.Int, offset)
       .input('limit', sql.Int, limit)
@@ -55,11 +40,8 @@ const getAllMerkmalstexte = async (req, res, next) => {
         FETCH NEXT @limit ROWS ONLY
       `);
     
-    console.log('✅ [DEBUG] Main data query executed successfully');
-    console.log('📝 [DEBUG] Records retrieved:', result.recordset.length);
     
     // Felder für das Frontend zuordnen
-    console.log('🔄 [DEBUG] Mapping database fields to frontend fields...');
     const recordsWithNewFields = result.recordset.map(record => ({
       ...record,
       // Wir ordnen die tatsächlichen Datenbankspalten den Frontend-Feldern zu
@@ -68,10 +50,8 @@ const getAllMerkmalstexte = async (req, res, next) => {
       fertigungsliste: record.fertigungsliste
     }));
     
-    console.log('✅ [DEBUG] Field mapping completed');
     
     // Return data with pagination metadata
-    console.log('📦 [DEBUG] Preparing response data with pagination metadata...');
     const responseData = {
       data: recordsWithNewFields,
       pagination: {
@@ -84,12 +64,8 @@ const getAllMerkmalstexte = async (req, res, next) => {
       }
     };
     
-    console.log('📤 [DEBUG] Sending successful response...');
-    console.log('✅ [DEBUG] getAllMerkmalstexte function completed successfully');
     res.status(200).json(formatSuccess(responseData, `Seite ${page} von ${totalPages} erfolgreich abgerufen`));
   } catch (err) {
-    console.log('❌ [DEBUG] Error in getAllMerkmalstexte:', err.message);
-    console.log('🔍 [DEBUG] Error details:', err);
     next(err);
   }
 };
@@ -97,7 +73,6 @@ const getAllMerkmalstexte = async (req, res, next) => {
 // Funktion zum Abrufen eines einzelnen Datensatzes nach ID (READ ONE)
 const getMerkmalstextById = async (req, res, next) => {
   const { id } = req.params;
-  console.log('⚡ [DEBUG] *** getMerkmalstextById CALLED with ID:', id);
 
   // Validate ID
   const idValidation = validateId(id);
@@ -132,26 +107,18 @@ const getMerkmalstextById = async (req, res, next) => {
 
 // Funktion zum Erstellen eines neuen Datensatzes (CREATE)
 const createMerkmalstext = async (req, res, next) => {
-  console.log('🆕 [DEBUG] createMerkmalstext function started');
-  console.log('📥 [DEBUG] Request body:', req.body);
 
   const { identnr, merkmal, auspraegung, drucktext, sondermerkmal, position, sonderAbt, fertigungsliste } = req.body;
 
-  console.log('✅ [DEBUG] Request body destructured successfully');
 
   // Validate input data
-  console.log('🔍 [DEBUG] Starting input validation...');
   const validation = validateMerkmalstexte(req.body);
   if (!validation.isValid) {
-    console.log('❌ [DEBUG] Validation failed:', validation.errors);
     return res.status(400).json(formatValidationError(validation.errors));
   }
-  console.log('✅ [DEBUG] Input validation successful');
 
   try {
-    console.log('📊 [DEBUG] Connecting to database pool...');
     const pool = await poolPromise;
-    console.log('✅ [DEBUG] Database pool connection successful');
 
     // New logic: if position is provided, use it; if empty, use 0
     let finalPosition = position ? parseInt(position) : 0;
@@ -455,14 +422,10 @@ const bulkUpdateMerkmalstextePositions = async (req, res, next) => {
 
 // Check for null ID records
 const checkNullIds = async (req, res, next) => {
-  console.log('🔍 [DEBUG] checkNullIds function started');
   
   try {
-    console.log('📊 [DEBUG] Connecting to database pool...');
     const pool = await poolPromise;
-    console.log('✅ [DEBUG] Database pool connection successful');
     
-    console.log('🗄️ [DEBUG] Executing null ID check query...');
     const result = await pool.request()
       .query(`
         SELECT *
@@ -471,11 +434,8 @@ const checkNullIds = async (req, res, next) => {
         ORDER BY identnr, merkmal
       `);
     
-    console.log('✅ [DEBUG] Null ID check query executed successfully');
-    console.log('📝 [DEBUG] Records with null IDs found:', result.recordset.length);
     
     if (result.recordset.length > 0) {
-      console.log('⚠️ [DEBUG] Found records with null IDs!');
       result.recordset.forEach((record, index) => {
         console.log(`[${index + 1}] identnr: ${record.identnr}, merkmal: ${record.merkmal}`);
       });
@@ -487,30 +447,22 @@ const checkNullIds = async (req, res, next) => {
       hasNullIds: result.recordset.length > 0
     };
     
-    console.log('📤 [DEBUG] Sending successful response...');
-    console.log('✅ [DEBUG] checkNullIds function completed successfully');
     res.status(200).json(formatSuccess(responseData, 
       result.recordset.length > 0 
         ? `${result.recordset.length} Datensätze mit NULL-ID gefunden`
         : 'Keine Datensätze mit NULL-ID gefunden'
     ));
   } catch (err) {
-    console.log('❌ [DEBUG] Error in checkNullIds:', err.message);
-    console.log('🔍 [DEBUG] Error details:', err);
     next(err);
   }
 };
 
 // Check for duplicate Ident-Nr entries
 const checkDuplicateIdentnrs = async (req, res, next) => {
-  console.log('🔍 [DEBUG] checkDuplicateIdentnrs function started');
   
   try {
-    console.log('📊 [DEBUG] Connecting to database pool...');
     const pool = await poolPromise;
-    console.log('✅ [DEBUG] Database pool connection successful');
     
-    console.log('🗄️ [DEBUG] Executing duplicate identnr query...');
     const result = await pool.request()
       .query(`
         SELECT 
@@ -525,11 +477,8 @@ const checkDuplicateIdentnrs = async (req, res, next) => {
         ORDER BY record_count DESC, identnr
       `);
     
-    console.log('✅ [DEBUG] Duplicate identnr query executed successfully');
-    console.log('📝 [DEBUG] Duplicate identnrs found:', result.recordset.length);
     
     if (result.recordset.length > 0) {
-      console.log('⚠️ [DEBUG] Found duplicate Ident-Nr entries!');
       result.recordset.forEach((record, index) => {
         console.log(`[${index + 1}] ${record.identnr}: ${record.record_count} kayıt - ID aralığı: ${record.first_id}-${record.last_id}`);
       });
@@ -564,36 +513,27 @@ const checkDuplicateIdentnrs = async (req, res, next) => {
       }
     };
     
-    console.log('📤 [DEBUG] Sending successful response...');
-    console.log('✅ [DEBUG] checkDuplicateIdentnrs function completed successfully');
     res.status(200).json(formatSuccess(responseData, 
       result.recordset.length > 0 
         ? `${result.recordset.length} Ident-Nr mit mehreren Datensätzen gefunden`
         : 'Keine doppelten Ident-Nr gefunden - jede Ident-Nr hat nur einen Datensatz'
     ));
   } catch (err) {
-    console.log('❌ [DEBUG] Error in checkDuplicateIdentnrs:', err.message);
-    console.log('🔍 [DEBUG] Error details:', err);
     next(err);
   }
 };
 
 // Get all records by Ident-Nr
 const getMerkmalstexteByIdentnr = async (req, res, next) => {
-  console.log('🔍 [DEBUG] getMerkmalstexteByIdentnr function started');
   const { identnr } = req.params;
-  console.log('📥 [DEBUG] Request params identnr:', identnr);
   
   if (!identnr) {
     return res.status(400).json(formatValidationError(['Ident-Nr ist erforderlich']));
   }
   
   try {
-    console.log('📊 [DEBUG] Connecting to database pool...');
     const pool = await poolPromise;
-    console.log('✅ [DEBUG] Database pool connection successful');
     
-    console.log('🗄️ [DEBUG] Executing get records by identnr query...');
     const result = await pool.request()
       .input('identnr', sql.VarChar, identnr)
       .query(`
@@ -602,8 +542,6 @@ const getMerkmalstexteByIdentnr = async (req, res, next) => {
         ORDER BY merkmalsposition, merkmal
       `);
     
-    console.log('✅ [DEBUG] Get records by identnr query executed successfully');
-    console.log('📝 [DEBUG] Records found:', result.recordset.length);
     
     // Felder für das Frontend zuordnen
     const recordsWithMappedFields = result.recordset.map(record => ({
@@ -613,23 +551,16 @@ const getMerkmalstexteByIdentnr = async (req, res, next) => {
       fertigungsliste: record.fertigungsliste
     }));
     
-    console.log('📤 [DEBUG] Sending successful response...');
-    console.log('✅ [DEBUG] getMerkmalstexteByIdentnr function completed successfully');
     res.status(200).json(formatSuccess(recordsWithMappedFields, 
       `${result.recordset.length} Datensätze für Ident-Nr ${identnr} gefunden`));
   } catch (err) {
-    console.log('❌ [DEBUG] Error in getMerkmalstexteByIdentnr:', err.message);
-    console.log('🔍 [DEBUG] Error details:', err);
     next(err);
   }
 };
 
 // Create new record for specific Ident-Nr
 const createMerkmalstextForIdentnr = async (req, res, next) => {
-  console.log('🆕 [DEBUG] createMerkmalstextForIdentnr function started');
   const { identnr } = req.params;
-  console.log('📥 [DEBUG] Request params identnr:', identnr);
-  console.log('📥 [DEBUG] Request body:', req.body);
   
   if (!identnr) {
     return res.status(400).json(formatValidationError(['Ident-Nr ist erforderlich']));
@@ -639,18 +570,13 @@ const createMerkmalstextForIdentnr = async (req, res, next) => {
   
   // Validate input data (identnr wird aus params übernommen)
   const dataToValidate = { identnr, merkmal, auspraegung, drucktext, sondermerkmal, position, sonderAbt, fertigungsliste };
-  console.log('🔍 [DEBUG] Starting input validation...');
   const validation = validateMerkmalstexte(dataToValidate);
   if (!validation.isValid) {
-    console.log('❌ [DEBUG] Validation failed:', validation.errors);
     return res.status(400).json(formatValidationError(validation.errors));
   }
-  console.log('✅ [DEBUG] Input validation successful');
   
   try {
-    console.log('📊 [DEBUG] Connecting to database pool...');
     const pool = await poolPromise;
-    console.log('✅ [DEBUG] Database pool connection successful');
 
     // New logic: if position is provided, use it; if empty, use 0
     let finalPosition = position ? parseInt(position) : 0;
@@ -695,43 +621,32 @@ const createMerkmalstextForIdentnr = async (req, res, next) => {
       fertigungsliste: record.fertigungsliste || null
     };
     
-    console.log('📤 [DEBUG] Sending successful response...');
-    console.log('✅ [DEBUG] createMerkmalstextForIdentnr function completed successfully');
     res.status(201).json(formatSuccess(createdRecord, `Datensatz für Ident-Nr ${identnr} erfolgreich erstellt`));
   } catch (err) {
-    console.log('❌ [DEBUG] Error in createMerkmalstextForIdentnr:', err.message);
-    console.log('🔍 [DEBUG] Error details:', err);
     next(err);
   }
 };
 
 // Delete all records for specific Ident-Nr
 const deleteMerkmalstexteByIdentnr = async (req, res, next) => {
-  console.log('🗑️ [DEBUG] deleteMerkmalstexteByIdentnr function started');
   const { identnr } = req.params;
-  console.log('📥 [DEBUG] Request params identnr:', identnr);
   
   if (!identnr) {
     return res.status(400).json(formatValidationError(['Ident-Nr ist erforderlich']));
   }
   
   try {
-    console.log('📊 [DEBUG] Connecting to database pool...');
     const pool = await poolPromise;
-    console.log('✅ [DEBUG] Database pool connection successful');
     
     // Execute within transaction for data integrity
     const result = await withTransaction(pool, async (transaction) => {
       const request = createRequest(transaction);
       
       // Delete all records with this identnr
-      console.log('🗄️ [DEBUG] Executing delete query...');
       const deleteResult = await request
         .input('identnr', sql.VarChar, identnr)
         .query('DELETE FROM merkmalstexte WHERE identnr = @identnr');
       
-      console.log('✅ [DEBUG] Delete query executed successfully');
-      console.log('📊 [DEBUG] Rows affected:', deleteResult.rowsAffected[0]);
       
       return deleteResult;
     });
@@ -742,29 +657,21 @@ const deleteMerkmalstexteByIdentnr = async (req, res, next) => {
       return res.status(404).json(formatError(`Keine Datensätze für Ident-Nr ${identnr} gefunden`));
     }
     
-    console.log('📤 [DEBUG] Sending successful response...');
-    console.log('✅ [DEBUG] deleteMerkmalstexteByIdentnr function completed successfully');
     res.status(200).json(formatSuccess(
       { deletedCount }, 
       `${deletedCount} Datensätze für Ident-Nr ${identnr} erfolgreich gelöscht`
     ));
   } catch (err) {
-    console.log('❌ [DEBUG] Error in deleteMerkmalstexteByIdentnr:', err.message);
-    console.log('🔍 [DEBUG] Error details:', err);
     next(err);
   }
 };
 
 // Get count of unique Ident-Nr values
 const getIdentnrCount = async (req, res, next) => {
-  console.log('🔢 [DEBUG] getIdentnrCount function started');
   
   try {
-    console.log('📊 [DEBUG] Connecting to database pool...');
     const pool = await poolPromise;
-    console.log('✅ [DEBUG] Database pool connection successful');
     
-    console.log('🗄️ [DEBUG] Executing count query...');
     const result = await pool.request()
       .query(`
         SELECT 
@@ -774,13 +681,9 @@ const getIdentnrCount = async (req, res, next) => {
         WHERE identnr IS NOT NULL
       `);
     
-    console.log('✅ [DEBUG] Count query executed successfully');
     
     const stats = result.recordset[0];
     
-    console.log('📝 [DEBUG] Statistics:');
-    console.log(`   - Unique Ident-Nr: ${stats.unique_identnr_count}`);
-    console.log(`   - Total Records: ${stats.total_records}`);
     
     const responseData = {
       uniqueIdentnrs: stats.unique_identnr_count,
@@ -788,27 +691,19 @@ const getIdentnrCount = async (req, res, next) => {
       avgRecordsPerIdentnr: Math.round(stats.total_records / stats.unique_identnr_count * 100) / 100
     };
     
-    console.log('📤 [DEBUG] Sending successful response...');
-    console.log('✅ [DEBUG] getIdentnrCount function completed successfully');
     res.status(200).json(formatSuccess(responseData, 
       `${stats.unique_identnr_count} eindeutige Ident-Nr gefunden (${stats.total_records} Datensätze insgesamt)`));
   } catch (err) {
-    console.log('❌ [DEBUG] Error in getIdentnrCount:', err.message);
-    console.log('🔍 [DEBUG] Error details:', err);
     next(err);
   }
 };
 
 // Get all unique Ident-Nr values (simple list)
 const getAllIdentnrs = async (req, res, next) => {
-  console.log('🔍 [DEBUG] getAllIdentnrs function started');
   
   try {
-    console.log('📊 [DEBUG] Connecting to database pool...');
     const pool = await poolPromise;
-    console.log('✅ [DEBUG] Database pool connection successful');
     
-    console.log('🗄️ [DEBUG] Executing all identnrs query...');
     const result = await pool.request()
       .query(`
         SELECT DISTINCT identnr 
@@ -817,27 +712,19 @@ const getAllIdentnrs = async (req, res, next) => {
         ORDER BY identnr
       `);
     
-    console.log('✅ [DEBUG] All identnrs query executed successfully');
-    console.log('📝 [DEBUG] Unique identnrs found:', result.recordset.length);
     
     const identnrs = result.recordset.map(record => record.identnr);
     
-    console.log('📤 [DEBUG] Sending successful response...');
-    console.log('✅ [DEBUG] getAllIdentnrs function completed successfully');
     res.status(200).json(formatSuccess(identnrs, 
       `${identnrs.length} eindeutige Ident-Nr erfolgreich abgerufen`));
   } catch (err) {
-    console.log('❌ [DEBUG] Error in getAllIdentnrs:', err.message);
-    console.log('🔍 [DEBUG] Error details:', err);
     next(err);
   }
 };
 
 // Add new custom Ident-Nr to database
 const addCustomIdentnr = async (req, res, next) => {
-  console.log('🆕 [DEBUG] addCustomIdentnr function started');
   const { identnr } = req.body;
-  console.log('📥 [DEBUG] Request body identnr:', identnr);
   
   // Validate input
   if (!identnr || !identnr.trim()) {
@@ -847,12 +734,9 @@ const addCustomIdentnr = async (req, res, next) => {
   const trimmedIdentnr = identnr.trim();
   
   try {
-    console.log('📊 [DEBUG] Connecting to database pool...');
     const pool = await poolPromise;
-    console.log('✅ [DEBUG] Database pool connection successful');
     
     // Check if identnr already exists
-    console.log('🔍 [DEBUG] Checking if identnr already exists...');
     const existsResult = await pool.request()
       .input('identnr', sql.VarChar, trimmedIdentnr)
       .query('SELECT COUNT(*) as count FROM merkmalstexte WHERE identnr = @identnr');
@@ -860,7 +744,6 @@ const addCustomIdentnr = async (req, res, next) => {
     const alreadyExists = existsResult.recordset[0].count > 0;
     
     if (alreadyExists) {
-      console.log('⚠️ [DEBUG] Identnr already exists in database');
       return res.status(200).json(formatSuccess(
         { identnr: trimmedIdentnr, existed: true }, 
         `Ident-Nr ${trimmedIdentnr} existiert bereits`
@@ -868,7 +751,6 @@ const addCustomIdentnr = async (req, res, next) => {
     }
     
     // Create a placeholder record with minimal data to register the identnr
-    console.log('🆕 [DEBUG] Creating placeholder record for new identnr...');
     const result = await withTransaction(pool, async (transaction) => {
       // Get next available position
       let finalPosition = await getNextAvailablePosition(pool);
@@ -901,8 +783,6 @@ const addCustomIdentnr = async (req, res, next) => {
     
     const createdRecord = result.recordset[0];
     
-    console.log('📤 [DEBUG] Sending successful response...');
-    console.log('✅ [DEBUG] addCustomIdentnr function completed successfully');
     res.status(201).json(formatSuccess({
       identnr: trimmedIdentnr,
       existed: false,
@@ -914,19 +794,14 @@ const addCustomIdentnr = async (req, res, next) => {
       }
     }, `Neue Ident-Nr ${trimmedIdentnr} erfolgreich hinzugefügt (Platzhalter-Datensatz erstellt)`));
   } catch (err) {
-    console.log('❌ [DEBUG] Error in addCustomIdentnr:', err.message);
-    console.log('🔍 [DEBUG] Error details:', err);
     next(err);
   }
 };
 
 // Copy record to multiple Ident-Nr values
 const copyRecordToMultipleIdentnrs = async (req, res, next) => {
-  console.log('📋 [DEBUG] copyRecordToMultipleIdentnrs function started');
   const { id } = req.params;
   const { identnrs } = req.body;
-  console.log('📥 [DEBUG] Request params id:', id);
-  console.log('📥 [DEBUG] Request body identnrs:', identnrs);
   
   // Validate ID
   const idValidation = validateId(id);
@@ -940,12 +815,9 @@ const copyRecordToMultipleIdentnrs = async (req, res, next) => {
   }
   
   try {
-    console.log('📊 [DEBUG] Connecting to database pool...');
     const pool = await poolPromise;
-    console.log('✅ [DEBUG] Database pool connection successful');
     
     // Get original record
-    console.log('🔍 [DEBUG] Getting original record...');
     const originalResult = await pool.request()
       .input('id', sql.Int, parseInt(id))
       .query('SELECT * FROM merkmalstexte WHERE id = @id');
@@ -955,7 +827,6 @@ const copyRecordToMultipleIdentnrs = async (req, res, next) => {
     }
     
     const originalRecord = originalResult.recordset[0];
-    console.log('📝 [DEBUG] Original record found:', originalRecord.identnr);
     
     // Execute within transaction for data integrity
     const results = await withTransaction(pool, async (transaction) => {
@@ -963,16 +834,13 @@ const copyRecordToMultipleIdentnrs = async (req, res, next) => {
 
       // Use original record's position for all copies (same merkmal/auspraegung should have same position)
       const originalPosition = originalRecord.merkmalsposition || 0;
-      console.log(`📍 [DEBUG] Using original position ${originalPosition} for all copied identnrs`);
 
       for (const targetIdentnr of identnrs) {
         // Skip if it's the same as original
         if (targetIdentnr === originalRecord.identnr) {
-          console.log(`⏭️ [DEBUG] Skipping same identnr: ${targetIdentnr}`);
           continue;
         }
 
-        console.log(`🆕 [DEBUG] Creating copy for identnr: ${targetIdentnr} with position: ${originalPosition}`);
         
         const request = createRequest(transaction);
         
@@ -997,23 +865,18 @@ const copyRecordToMultipleIdentnrs = async (req, res, next) => {
             sonderAbt: newRecord.maka,
             fertigungsliste: newRecord.fertigungsliste
           });
-          console.log(`✅ [DEBUG] Created record ID ${newRecord.id} for identnr: ${targetIdentnr} with position: ${originalPosition}`);
         }
       }
       
       return createdRecords;
     });
     
-    console.log('📤 [DEBUG] Sending successful response...');
-    console.log('✅ [DEBUG] copyRecordToMultipleIdentnrs function completed successfully');
     res.status(201).json(formatSuccess({
       originalRecord: originalRecord,
       createdRecords: results,
       copiedToIdentnrs: identnrs.filter(identnr => identnr !== originalRecord.identnr)
     }, `Datensatz in ${results.length} neue Ident-Nr kopiert`));
   } catch (err) {
-    console.log('❌ [DEBUG] Error in copyRecordToMultipleIdentnrs:', err.message);
-    console.log('🔍 [DEBUG] Error details:', err);
     next(err);
   }
 };
@@ -1140,20 +1003,13 @@ const getFilteredMerkmalstexte = async (req, res, next) => {
 
 // Get grouped datasets for main listing - gruplandırılmış ana liste
 const getGroupedMerkmalstexte = async (req, res, next) => {
-  console.log('🎯 [DEBUG] *** getGroupedMerkmalstexte CALLED! ***');
-  console.log('🔍 [DEBUG] getGroupedMerkmalstexte function started');
-  console.log('📥 [DEBUG] Request query parameters:', req.query);
 
   try {
-    console.log('📊 [DEBUG] Connecting to database pool...');
     const pool = await poolPromise;
-    console.log('✅ [DEBUG] Database pool connection successful');
 
     // No backend pagination - return all grouped records
-    console.log('📄 [DEBUG] Fetching all grouped records without pagination...');
 
     // Get total count for pagination metadata (grouped data count)
-    console.log('🔢 [DEBUG] Executing grouped count query...');
     const countResult = await pool.request().query(`
       WITH GroupedData AS (
         SELECT
@@ -1187,11 +1043,8 @@ const getGroupedMerkmalstexte = async (req, res, next) => {
     `);
     const totalCount = countResult.recordset[0].total;
 
-    console.log('📊 [DEBUG] Grouped count query result:');
-    console.log('   - Total grouped records:', totalCount);
 
     // Get all grouped records without pagination
-    console.log('🗄️ [DEBUG] Executing main grouped data query...');
     const result = await pool.request()
       .query(`
         WITH GroupedData AS (
@@ -1242,11 +1095,8 @@ const getGroupedMerkmalstexte = async (req, res, next) => {
         ORDER BY merkmal, auspraegung, drucktext
       `);
 
-    console.log('✅ [DEBUG] Main grouped data query executed successfully');
-    console.log('📝 [DEBUG] Grouped records retrieved:', result.recordset.length);
 
     // Map fields for frontend compatibility
-    console.log('🔄 [DEBUG] Mapping database fields to frontend fields...');
     const recordsWithNewFields = result.recordset.map(record => ({
       id: record.first_id, // Use first ID as primary ID for frontend
       identnr: record.identnr_list, // All identnrs as comma-separated string (hidden in list)
@@ -1265,21 +1115,15 @@ const getGroupedMerkmalstexte = async (req, res, next) => {
       }
     }));
 
-    console.log('✅ [DEBUG] Field mapping completed');
 
     // Return data with pagination metadata
-    console.log('📦 [DEBUG] Preparing response data...');
     const responseData = {
       data: recordsWithNewFields,
       totalCount: totalCount
     };
 
-    console.log('📤 [DEBUG] Sending successful response...');
-    console.log('✅ [DEBUG] getGroupedMerkmalstexte function completed successfully');
     res.status(200).json(formatSuccess(responseData, `${totalCount} gruplandırılmış kayıt erfolgreich abgerufen`));
   } catch (err) {
-    console.log('❌ [DEBUG] Error in getGroupedMerkmalstexte:', err.message);
-    console.log('🔍 [DEBUG] Error details:', err);
     next(err);
   }
 };
@@ -1288,7 +1132,6 @@ const getGroupedMerkmalstexte = async (req, res, next) => {
 const getSimilarDatasets = async (req, res) => {
   const { id } = req.params;
 
-  console.log(`🔍 [DEBUG] getSimilarDatasets function started for ID: ${id}`);
 
   try {
     const pool = await poolPromise;
@@ -1307,7 +1150,6 @@ const getSimilarDatasets = async (req, res) => {
 
     const { merkmal, auspraegung, drucktext, sondermerkmal } = originalRecord.recordset[0];
     
-    console.log(`📊 [DEBUG] Original record data:`, { merkmal, auspraegung, drucktext, sondermerkmal });
 
     // Aynı datensatz'a ait tüm kayıtları bul
     const similarRecords = await pool.request()
@@ -1325,7 +1167,6 @@ const getSimilarDatasets = async (req, res) => {
         ORDER BY identnr, merkmalsposition
       `);
 
-    console.log(`✅ [DEBUG] Found ${similarRecords.recordset.length} similar records`);
 
     res.json({
       success: true,
@@ -1357,10 +1198,6 @@ const updateGroupedMerkmalstexte = async (req, res, next) => {
       identnrs       // Array of identnrs that should be in this group
     } = req.body;
 
-    console.log('🔄 [DEBUG] updateGroupedMerkmalstexte called');
-    console.log('Original data:', originalData);
-    console.log('New data:', newData);
-    console.log('Identnrs:', identnrs);
 
     const pool = await poolPromise;
 
@@ -1437,8 +1274,6 @@ const updateGroupedMerkmalstexte = async (req, res, next) => {
 
 // Bulk delete by group data - delete all records with same merkmal/auspraegung/drucktext
 const bulkDeleteByGroupData = async (req, res, next) => {
-  console.log('🗑️ [DEBUG] bulkDeleteByGroupData function started');
-  console.log('📥 [DEBUG] Request body:', req.body);
 
   const { merkmal, auspraegung, drucktext, sondermerkmal, position, sonderAbt, fertigungsliste } = req.body;
 
@@ -1448,9 +1283,7 @@ const bulkDeleteByGroupData = async (req, res, next) => {
   }
 
   try {
-    console.log('📊 [DEBUG] Connecting to database pool...');
     const pool = await poolPromise;
-    console.log('✅ [DEBUG] Database pool connection successful');
 
     const result = await withTransaction(pool, async (transaction) => {
       const request = createRequest(transaction);
@@ -1490,7 +1323,6 @@ const bulkDeleteByGroupData = async (req, res, next) => {
       const countResult = await request.query(countQuery);
       const recordCount = countResult.recordset[0].count;
 
-      console.log(`🔍 [DEBUG] Found ${recordCount} records matching group criteria`);
 
       if (recordCount === 0) {
         return { deletedCount: 0, message: 'Keine passenden Datensätze gefunden' };
@@ -1501,7 +1333,6 @@ const bulkDeleteByGroupData = async (req, res, next) => {
       const deleteResult = await request.query(deleteQuery);
       const deletedCount = deleteResult.rowsAffected[0];
 
-      console.log(`✅ [DEBUG] Successfully deleted ${deletedCount} records`);
 
       return { deletedCount, recordCount };
     });
@@ -1512,16 +1343,12 @@ const bulkDeleteByGroupData = async (req, res, next) => {
       return res.status(404).json(formatError(message));
     }
 
-    console.log('📤 [DEBUG] Sending successful response...');
-    console.log('✅ [DEBUG] bulkDeleteByGroupData function completed successfully');
 
     res.status(200).json(formatSuccess(
       { deletedCount },
       `${deletedCount} Datensätze der Gruppe erfolgreich gelöscht`
     ));
   } catch (err) {
-    console.log('❌ [DEBUG] Error in bulkDeleteByGroupData:', err.message);
-    console.log('🔍 [DEBUG] Error details:', err);
     next(err);
   }
 };
