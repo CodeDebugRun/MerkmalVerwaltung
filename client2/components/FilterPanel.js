@@ -16,21 +16,7 @@ const FilterPanel = ({
   onSearch,
   onClearFilters
 }) => {
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (showFilterIdentnrDropdown && !event.target.closest('.multi-select-container')) {
-        onDropdownToggle(); // This will close the dropdown
-      }
-    };
-
-    if (showFilterIdentnrDropdown) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => {
-        document.removeEventListener('mousedown', handleClickOutside);
-      };
-    }
-  }, [showFilterIdentnrDropdown, onDropdownToggle]);
+  // Note: Click outside handling is now done in the main page component
 
   if (!showFilters) {
     return null;
@@ -38,7 +24,7 @@ const FilterPanel = ({
 
   return (
     <section className="form-section">
-      <h3>🔍 Erweiterte Filter</h3>
+      <h3>🔍 Datensätze Filter</h3>
       <div className="data-form">
         <div className="form-row">
           {/* Multi-Select Ident-Nr Filter */}
@@ -46,7 +32,7 @@ const FilterPanel = ({
             <label>Ident-Nr</label>
             <div className="multi-select-container">
               <div
-                className="multi-select-header filter-input"
+                className="multi-select-header filter-input filter-identnr-dropdown-trigger"
                 onClick={onDropdownToggle}
               >
               {selectedFilterIdentnrs.length === 0
@@ -57,7 +43,7 @@ const FilterPanel = ({
             </div>
 
             {showFilterIdentnrDropdown && (
-              <div className="multi-select-dropdown">
+              <div className="multi-select-dropdown filter-identnr-dropdown-menu">
                 {/* Filter input for search */}
                 <div className="custom-input-container">
                   <input

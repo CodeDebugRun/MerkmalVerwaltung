@@ -19,21 +19,7 @@ const MerkmalForm = ({
   onToggleIdentnrSelection,
   onCancel
 }) => {
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (showIdentnrDropdown && !event.target.closest('.multi-select-container')) {
-        onDropdownToggle(); // This will close the dropdown
-      }
-    };
-
-    if (showIdentnrDropdown) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => {
-        document.removeEventListener('mousedown', handleClickOutside);
-      };
-    }
-  }, [showIdentnrDropdown, onDropdownToggle]);
+  // Note: Click outside handling is now done in the main page component
 
   if (!showForm) {
     return null;
@@ -47,7 +33,7 @@ const MerkmalForm = ({
           {/* Multi-Select Ident-Nr Dropdown */}
           <div className="multi-select-container">
             <div
-              className="multi-select-header form-input"
+              className="multi-select-header form-input form-identnr-dropdown-trigger"
               onClick={onDropdownToggle}
             >
               {selectedIdentnrs.length === 0
@@ -58,7 +44,7 @@ const MerkmalForm = ({
             </div>
 
             {showIdentnrDropdown && (
-              <div className="multi-select-dropdown">
+              <div className="multi-select-dropdown form-identnr-dropdown-menu">
                 {/* Custom input field */}
                 <div className="custom-input-container">
                   <input

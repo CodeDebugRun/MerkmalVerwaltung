@@ -256,6 +256,45 @@ export default function Home() {
     }
   }, [successMessage]);
 
+  // Handle click outside to close dropdowns
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      // Check if click is outside inline dropdown
+      if (showInlineDropdown) {
+        const dropdownElement = event.target.closest('.identnr-dropdown-trigger, .identnr-dropdown-menu');
+        if (!dropdownElement) {
+          setShowInlineDropdown(false);
+        }
+      }
+
+      // Check if click is outside filter dropdown
+      if (showFilterIdentnrDropdown) {
+        const filterDropdownElement = event.target.closest('.filter-identnr-dropdown-trigger, .filter-identnr-dropdown-menu');
+        if (!filterDropdownElement) {
+          setShowFilterIdentnrDropdown(false);
+        }
+      }
+
+      // Check if click is outside form dropdown
+      if (showIdentnrDropdown) {
+        const formDropdownElement = event.target.closest('.form-identnr-dropdown-trigger, .form-identnr-dropdown-menu');
+        if (!formDropdownElement) {
+          setShowIdentnrDropdown(false);
+        }
+      }
+    };
+
+    // Add event listener when any dropdown is open
+    if (showInlineDropdown || showFilterIdentnrDropdown || showIdentnrDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    // Cleanup
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showInlineDropdown, showFilterIdentnrDropdown, showIdentnrDropdown]);
+
   // Utility functions
   const showSuccess = (message) => setSuccessMessage(message);
 
@@ -674,7 +713,7 @@ export default function Home() {
         params.append('identnr', selectedFilterIdentnrs[0]); // Only one allowed
       }
 
-      params.append('limit', '100'); // Default limit
+      params.append('limit', '300000'); // Very high limit to get all results
 
       const response = await fetch(`${API_BASE}/filter?${params.toString()}`);
       const data = await response.json();
@@ -865,7 +904,13 @@ export default function Home() {
 
             <button
               className="btn btn-info"
-              onClick={() => setShowFilters(!showFilters)}
+              onClick={() => {
+                if (showFilters) {
+                  // Filter panel kapatılıyorsa filtreleri temizle
+                  handleClearFilters();
+                }
+                setShowFilters(!showFilters);
+              }}
               title="Filter Panel"
             >
               🔍
@@ -954,7 +999,7 @@ export default function Home() {
 
         <section className="data-section">
           <div className="data-header">
-            <h3>Datensätze</h3>
+            <h3>Merkmal Gruppen</h3>
             {!loading && (
               <p className="data-info">
                 {hasData

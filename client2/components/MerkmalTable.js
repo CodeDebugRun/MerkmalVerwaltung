@@ -199,30 +199,14 @@ const MerkmalTable = ({
               <div style={{display: 'flex', gap: '4px', justifyContent: 'center'}}>
                 <button
                   onClick={() => onColumnFilterChange && onColumnFilterChange('apply', 'all')}
-                  style={{
-                    padding: '4px 8px',
-                    fontSize: '12px',
-                    border: '1px solid #007bff',
-                    backgroundColor: '#007bff',
-                    color: '#fff',
-                    borderRadius: '3px',
-                    cursor: 'pointer'
-                  }}
+                  className="table-filter-btn table-filter-apply"
                   title="Filter anwenden"
                 >
                   🔍
                 </button>
                 <button
                   onClick={() => onColumnFilterChange && onColumnFilterChange('clear', 'all')}
-                  style={{
-                    padding: '4px 8px',
-                    fontSize: '12px',
-                    border: '1px solid #6c757d',
-                    backgroundColor: '#6c757d',
-                    color: '#fff',
-                    borderRadius: '3px',
-                    cursor: 'pointer'
-                  }}
+                  className="table-filter-btn table-filter-reset"
                   title="Filter zurücksetzen"
                 >
                   🔄

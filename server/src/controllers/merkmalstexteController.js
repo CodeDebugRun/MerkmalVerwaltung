@@ -134,11 +134,11 @@ const getMerkmalstextById = async (req, res, next) => {
 const createMerkmalstext = async (req, res, next) => {
   console.log('🆕 [DEBUG] createMerkmalstext function started');
   console.log('📥 [DEBUG] Request body:', req.body);
-  
+
   const { identnr, merkmal, auspraegung, drucktext, sondermerkmal, position, sonderAbt, fertigungsliste } = req.body;
-  
+
   console.log('✅ [DEBUG] Request body destructured successfully');
-  
+
   // Validate input data
   console.log('🔍 [DEBUG] Starting input validation...');
   const validation = validateMerkmalstexte(req.body);
@@ -147,30 +147,30 @@ const createMerkmalstext = async (req, res, next) => {
     return res.status(400).json(formatValidationError(validation.errors));
   }
   console.log('✅ [DEBUG] Input validation successful');
-  
+
   try {
     console.log('📊 [DEBUG] Connecting to database pool...');
     const pool = await poolPromise;
     console.log('✅ [DEBUG] Database pool connection successful');
-    
-    // Determine position: use provided position or get next available
-    let finalPosition = position ? parseInt(position) : null;
-    if (!finalPosition) {
-      finalPosition = await getNextAvailablePosition(pool);
-    }
-    
-    // Execute within transaction for data integrity with position shifting
+
+    // New logic: if position is provided, use it; if empty, use 0
+    let finalPosition = position ? parseInt(position) : 0;
+
+    // Execute within transaction for data integrity
     const result = await withTransaction(pool, async (transaction) => {
-      // Validate position uniqueness with row-level locking
-      const isPositionUnique = await validatePositionUniqueness(transaction, finalPosition);
-      if (!isPositionUnique) {
-        finalPosition = await findNextSafePosition(transaction, finalPosition);
-        console.log(`🔄 Position angepasst auf: ${finalPosition}`);
+      // Only do position validation and shifting if position is not 0
+      if (finalPosition !== 0) {
+        // Validate position uniqueness with row-level locking
+        const isPositionUnique = await validatePositionUniqueness(transaction, finalPosition);
+        if (!isPositionUnique) {
+          finalPosition = await findNextSafePosition(transaction, finalPosition);
+          console.log(`🔄 Position angepasst auf: ${finalPosition}`);
+        }
+
+        // Shift existing positions up before inserting
+        await shiftPositionsUp(transaction, finalPosition);
       }
-      
-      // LEGACY LOGIC: Shift existing positions up before inserting
-      await shiftPositionsUp(transaction, finalPosition);
-      
+
       const request = createRequest(transaction);
       
       return await request
@@ -649,24 +649,24 @@ const createMerkmalstextForIdentnr = async (req, res, next) => {
     console.log('📊 [DEBUG] Connecting to database pool...');
     const pool = await poolPromise;
     console.log('✅ [DEBUG] Database pool connection successful');
-    
-    // Determine position: use provided position or get next available
-    let finalPosition = position ? parseInt(position) : null;
-    if (!finalPosition) {
-      finalPosition = await getNextAvailablePosition(pool);
-    }
-    
-    // Execute within transaction for data integrity with position shifting
+
+    // New logic: if position is provided, use it; if empty, use 0
+    let finalPosition = position ? parseInt(position) : 0;
+
+    // Execute within transaction for data integrity
     const result = await withTransaction(pool, async (transaction) => {
-      // Validate position uniqueness with row-level locking
-      const isPositionUnique = await validatePositionUniqueness(transaction, finalPosition);
-      if (!isPositionUnique) {
-        finalPosition = await findNextSafePosition(transaction, finalPosition);
-        console.log(`🔄 Position angepasst auf: ${finalPosition}`);
+      // Only do position validation and shifting if position is not 0
+      if (finalPosition !== 0) {
+        // Validate position uniqueness with row-level locking
+        const isPositionUnique = await validatePositionUniqueness(transaction, finalPosition);
+        if (!isPositionUnique) {
+          finalPosition = await findNextSafePosition(transaction, finalPosition);
+          console.log(`🔄 Position angepasst auf: ${finalPosition}`);
+        }
+
+        // Shift existing positions up before inserting
+        await shiftPositionsUp(transaction, finalPosition);
       }
-      
-      // LEGACY LOGIC: Shift existing positions up before inserting
-      await shiftPositionsUp(transaction, finalPosition);
       
       const request = createRequest(transaction);
       
@@ -958,28 +958,19 @@ const copyRecordToMultipleIdentnrs = async (req, res, next) => {
     // Execute within transaction for data integrity
     const results = await withTransaction(pool, async (transaction) => {
       const createdRecords = [];
-      
+
+      // Use original record's position for all copies (same merkmal/auspraegung should have same position)
+      const originalPosition = originalRecord.merkmalsposition || 0;
+      console.log(`📍 [DEBUG] Using original position ${originalPosition} for all copied identnrs`);
+
       for (const targetIdentnr of identnrs) {
         // Skip if it's the same as original
         if (targetIdentnr === originalRecord.identnr) {
           console.log(`⏭️ [DEBUG] Skipping same identnr: ${targetIdentnr}`);
           continue;
         }
-        
-        console.log(`🆕 [DEBUG] Creating copy for identnr: ${targetIdentnr}`);
-        
-        // Get next available position
-        let finalPosition = await getNextAvailablePosition(pool);
-        
-        // Validate position uniqueness with row-level locking
-        const isPositionUnique = await validatePositionUniqueness(transaction, finalPosition);
-        if (!isPositionUnique) {
-          finalPosition = await findNextSafePosition(transaction, finalPosition);
-          console.log(`🔄 Position angepasst auf: ${finalPosition}`);
-        }
-        
-        // Shift existing positions up before inserting
-        await shiftPositionsUp(transaction, finalPosition);
+
+        console.log(`🆕 [DEBUG] Creating copy for identnr: ${targetIdentnr} with position: ${originalPosition}`);
         
         const request = createRequest(transaction);
         
@@ -989,13 +980,13 @@ const copyRecordToMultipleIdentnrs = async (req, res, next) => {
           .input('auspraegung', sql.VarChar, originalRecord.auspraegung)
           .input('drucktext', sql.VarChar, originalRecord.drucktext)
           .input('sondermerkmal', sql.VarChar, originalRecord.sondermerkmal || '')
-          .input('merkmalsposition', sql.Int, finalPosition)
+          .input('merkmalsposition', sql.Int, originalPosition)
           .input('maka', sql.Int, originalRecord.maka)
           .input('fertigungsliste', sql.Int, originalRecord.fertigungsliste)
-          .query(`INSERT INTO merkmalstexte (identnr, merkmal, auspraegung, drucktext, sondermerkmal, merkmalsposition, maka, fertigungsliste) 
-                  VALUES (@identnr, @merkmal, @auspraegung, @drucktext, @sondermerkmal, @merkmalsposition, @maka, @fertigungsliste); 
+          .query(`INSERT INTO merkmalstexte (identnr, merkmal, auspraegung, drucktext, sondermerkmal, merkmalsposition, maka, fertigungsliste)
+                  VALUES (@identnr, @merkmal, @auspraegung, @drucktext, @sondermerkmal, @merkmalsposition, @maka, @fertigungsliste);
                   SELECT * FROM merkmalstexte WHERE id = SCOPE_IDENTITY()`);
-        
+
         if (result.recordset.length > 0) {
           const newRecord = result.recordset[0];
           createdRecords.push({
@@ -1004,7 +995,7 @@ const copyRecordToMultipleIdentnrs = async (req, res, next) => {
             sonderAbt: newRecord.maka,
             fertigungsliste: newRecord.fertigungsliste
           });
-          console.log(`✅ [DEBUG] Created record ID ${newRecord.id} for identnr: ${targetIdentnr}`);
+          console.log(`✅ [DEBUG] Created record ID ${newRecord.id} for identnr: ${targetIdentnr} with position: ${originalPosition}`);
         }
       }
       
@@ -1035,7 +1026,7 @@ const getFilteredMerkmalstexte = async (req, res, next) => {
     
     // Extract pagination parameters with defaults and validation
     const currentPage = Math.max(1, parseInt(page) || 1);
-    const pageSize = Math.max(1, Math.min(parseInt(limit) || 50, 1000)); // Max 1000 per page
+    const pageSize = Math.max(1, Math.min(parseInt(limit) || 50, 500000)); // Max 500000 per page
     const offset = (currentPage - 1) * pageSize;
     
     // Build dynamic WHERE clause
@@ -1165,12 +1156,30 @@ const getGroupedMerkmalstexte = async (req, res, next) => {
       WITH GroupedData AS (
         SELECT
           merkmal, auspraegung, drucktext,
-          ISNULL(sondermerkmal, '') as sondermerkmal,
-          ISNULL(merkmalsposition, 0) as merkmalsposition,
-          ISNULL(maka, 0) as maka,
-          ISNULL(fertigungsliste, 0) as fertigungsliste
+          merkmalsposition, maka,
+          CASE
+            WHEN sondermerkmal IS NULL OR LTRIM(RTRIM(sondermerkmal)) = ''
+            THEN 'EMPTY'
+            ELSE sondermerkmal
+          END as normalized_sondermerkmal,
+          CASE
+            WHEN fertigungsliste IS NULL OR fertigungsliste = 0
+            THEN 'EMPTY'
+            ELSE CAST(fertigungsliste AS NVARCHAR)
+          END as normalized_fertigungsliste
         FROM merkmalstexte
-        GROUP BY merkmal, auspraegung, drucktext, sondermerkmal, merkmalsposition, maka, fertigungsliste
+        GROUP BY
+          merkmal, auspraegung, drucktext, merkmalsposition, maka,
+          CASE
+            WHEN sondermerkmal IS NULL OR LTRIM(RTRIM(sondermerkmal)) = ''
+            THEN 'EMPTY'
+            ELSE sondermerkmal
+          END,
+          CASE
+            WHEN fertigungsliste IS NULL OR fertigungsliste = 0
+            THEN 'EMPTY'
+            ELSE CAST(fertigungsliste AS NVARCHAR)
+          END
       )
       SELECT COUNT(*) as total FROM GroupedData
     `);
@@ -1186,18 +1195,48 @@ const getGroupedMerkmalstexte = async (req, res, next) => {
         WITH GroupedData AS (
           SELECT
             merkmal, auspraegung, drucktext,
-            ISNULL(sondermerkmal, '') as sondermerkmal,
-            ISNULL(merkmalsposition, 0) as merkmalsposition,
-            ISNULL(maka, 0) as maka,
-            ISNULL(fertigungsliste, 0) as fertigungsliste,
+            merkmalsposition, maka,
+            CASE
+              WHEN sondermerkmal IS NULL OR LTRIM(RTRIM(sondermerkmal)) = ''
+              THEN 'EMPTY'
+              ELSE sondermerkmal
+            END as normalized_sondermerkmal,
+            CASE
+              WHEN fertigungsliste IS NULL OR fertigungsliste = 0
+              THEN 'EMPTY'
+              ELSE CAST(fertigungsliste AS NVARCHAR)
+            END as normalized_fertigungsliste,
             STRING_AGG(identnr, ',') as identnr_list,
             STRING_AGG(CAST(id AS NVARCHAR), ',') as id_list,
             COUNT(*) as record_count,
             MIN(id) as first_id
           FROM merkmalstexte
-          GROUP BY merkmal, auspraegung, drucktext, sondermerkmal, merkmalsposition, maka, fertigungsliste
+          GROUP BY
+            merkmal, auspraegung, drucktext, merkmalsposition, maka,
+            CASE
+              WHEN sondermerkmal IS NULL OR LTRIM(RTRIM(sondermerkmal)) = ''
+              THEN 'EMPTY'
+              ELSE sondermerkmal
+            END,
+            CASE
+              WHEN fertigungsliste IS NULL OR fertigungsliste = 0
+              THEN 'EMPTY'
+              ELSE CAST(fertigungsliste AS NVARCHAR)
+            END
         )
-        SELECT * FROM GroupedData
+        SELECT
+          first_id,
+          merkmal,
+          auspraegung,
+          drucktext,
+          CASE WHEN normalized_sondermerkmal = 'EMPTY' THEN '' ELSE normalized_sondermerkmal END as sondermerkmal,
+          CASE WHEN normalized_fertigungsliste = 'EMPTY' THEN 0 ELSE CAST(normalized_fertigungsliste AS INT) END as fertigungsliste,
+          merkmalsposition,
+          maka,
+          identnr_list,
+          id_list,
+          record_count
+        FROM GroupedData
         ORDER BY merkmal, auspraegung, drucktext
       `);
 
@@ -1212,10 +1251,10 @@ const getGroupedMerkmalstexte = async (req, res, next) => {
       merkmal: record.merkmal,
       auspraegung: record.auspraegung,
       drucktext: record.drucktext,
-      sondermerkmal: record.sondermerkmal,
+      sondermerkmal: record.sondermerkmal || '',
       position: record.merkmalsposition,
       sonderAbt: record.maka,
-      fertigungsliste: record.fertigungsliste,
+      fertigungsliste: record.fertigungsliste || 0,
       // Hidden metadata for inline edit
       _groupData: {
         record_count: record.record_count,
