@@ -227,8 +227,10 @@ const updateMerkmalstext = async (req, res, next) => {
     
     // Execute within transaction for data integrity with position reordering
     const result = await withTransaction(pool, async (transaction) => {
-      // LEGACY LOGIC: Handle position reordering if position changed
-      if (newPosition && oldPosition && newPosition !== oldPosition) {
+      // DISABLED: Handle position reordering if position changed (causes issues with bulk updates)
+      // Group updates should maintain same position for all records
+      const shouldReorder = false; // Disable reordering for now
+      if (shouldReorder && newPosition && oldPosition && newPosition !== oldPosition) {
         await reorderPositions(transaction, id, oldPosition, newPosition);
         
         // After reordering, just update other fields (position already set)

@@ -261,7 +261,17 @@ const MerkmalTable = ({
                   <td colSpan={8}>
                     <div className="inline-edit-form">
                       <div className="inline-form-header">
-                        <h4>✏️ Datensatz bearbeiten: {item.identnr}</h4>
+                        <h4>✏️ Datensatz bearbeiten: {(() => {
+                          const identnrList = item._groupData?.identnr_list || item.identnr;
+                          console.log('🔍 Edit header identnr data:', {
+                            rawIdentnrList: identnrList,
+                            itemIdentnr: item.identnr,
+                            groupData: item._groupData
+                          });
+                          // Remove duplicates and clean up
+                          const cleanList = identnrList.split(',').map(id => id.trim()).filter((id, index, arr) => arr.indexOf(id) === index).join(',');
+                          return cleanList;
+                        })()}</h4>
                       </div>
                       <div className="inline-form-grid">
                         {/* Identnr Dropdown */}
@@ -281,10 +291,13 @@ const MerkmalTable = ({
                             }}
                           >
                             <span>
-                              {selectedIdentnrs.length === 0
-                                ? 'Ident-Nr. auswählen...'
-                                : `${selectedIdentnrs.length} Ident-Nr ausgewählt`
-                              }
+                              {(() => {
+                                // Remove duplicates from selectedIdentnrs for count
+                                const uniqueIdentnrs = [...new Set(selectedIdentnrs)];
+                                return uniqueIdentnrs.length === 0
+                                  ? 'Ident-Nr. auswählen...'
+                                  : `${uniqueIdentnrs.length} Ident-Nr ausgewählt`;
+                              })()}
                             </span>
                             <span className="dropdown-arrow">{showInlineDropdown ? '▲' : '▼'}</span>
                           </div>

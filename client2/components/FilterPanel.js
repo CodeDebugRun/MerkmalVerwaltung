@@ -115,6 +115,7 @@ const FilterPanel = ({
               placeholder="Merkmal eingeben..."
               value={filterData.merkmal}
               onChange={(e) => onFilterChange('merkmal', e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && onSearch()}
               className="filter-input"
             />
           </div>
@@ -128,6 +129,7 @@ const FilterPanel = ({
               placeholder="Ausprägung eingeben..."
               value={filterData.auspraegung}
               onChange={(e) => onFilterChange('auspraegung', e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && onSearch()}
               className="filter-input"
             />
           </div>
@@ -139,6 +141,7 @@ const FilterPanel = ({
               placeholder="Drucktext eingeben..."
               value={filterData.drucktext}
               onChange={(e) => onFilterChange('drucktext', e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && onSearch()}
               className="filter-input"
             />
           </div>
@@ -152,6 +155,7 @@ const FilterPanel = ({
               placeholder="Sondermerkmal eingeben..."
               value={filterData.sondermerkmal}
               onChange={(e) => onFilterChange('sondermerkmal', e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && onSearch()}
               className="filter-input"
             />
           </div>
@@ -163,6 +167,7 @@ const FilterPanel = ({
               placeholder="Position eingeben..."
               value={filterData.position}
               onChange={(e) => onFilterChange('position', e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && onSearch()}
               className="filter-input"
             />
           </div>

@@ -296,7 +296,15 @@ export default function Home() {
   }, [showInlineDropdown, showFilterIdentnrDropdown, showIdentnrDropdown]);
 
   // Utility functions
-  const showSuccess = (message) => setSuccessMessage(message);
+  const showSuccess = (message) => {
+    console.log('🎉 SUCCESS MESSAGE:', message);
+    setSuccessMessage(message);
+
+    // Auto-clear success message after 5 seconds
+    setTimeout(() => {
+      setSuccessMessage('');
+    }, 5000);
+  };
 
   const handleApiError = (err, defaultMessage) => {
     const message = err.response?.data?.message || err.message || defaultMessage;
@@ -440,6 +448,11 @@ export default function Home() {
       setAppliedColumnFilters(newFilters);
       setCurrentPage(1);
 
+      // Close any open editing modals when filters change
+      if (editingItem) {
+        resetForm();
+      }
+
       // Log filter results to console
       console.log('🔍 Column Filter Applied:', newFilters);
 
@@ -500,6 +513,11 @@ export default function Home() {
         fertigungsliste: ''
       });
       setCurrentPage(1);
+
+      // Close any open editing modals when filters are cleared
+      if (editingItem) {
+        resetForm();
+      }
 
       console.log('🗑️ Column Filters Cleared - Showing all records:', merkmalstexte.length);
 
@@ -595,6 +613,11 @@ export default function Home() {
       }
 
       const result = await response.json();
+      console.log('🔍 DELETE Response:', {
+        resultData: result.data,
+        backendDeletedCount: result.data?.deletedCount,
+        frontendRecordCount: recordCount
+      });
       const deletedCount = result.data?.deletedCount || recordCount;
 
       if (recordCount === 1) {
@@ -649,19 +672,33 @@ export default function Home() {
 
       const currentIdentnrs = selectedInlineIdentnrs;
 
+      console.log('🔄 Update operation started:', {
+        editingItemId: editingItem.id,
+        originalIdentnrs,
+        currentIdentnrs,
+        formData,
+        groupData: editingItem._groupData
+      });
+
+      // Remove duplicates from arrays before calculation
+      const uniqueOriginalIdentnrs = [...new Set(originalIdentnrs)];
+      const uniqueCurrentIdentnrs = [...new Set(currentIdentnrs)];
+
       // Find identnrs to add (selected but not in original)
-      const identnrsToAdd = currentIdentnrs.filter(id => !originalIdentnrs.includes(id));
+      const identnrsToAdd = uniqueCurrentIdentnrs.filter(id => !uniqueOriginalIdentnrs.includes(id));
 
       // Find identnrs to remove (in original but not selected)
-      const identnrsToRemove = originalIdentnrs.filter(id => !currentIdentnrs.includes(id));
+      const identnrsToRemove = uniqueOriginalIdentnrs.filter(id => !uniqueCurrentIdentnrs.includes(id));
 
       // Find identnrs to update (in both lists)
-      const identnrsToUpdate = currentIdentnrs.filter(id => originalIdentnrs.includes(id));
+      const identnrsToUpdate = uniqueCurrentIdentnrs.filter(id => uniqueOriginalIdentnrs.includes(id));
 
-      console.log('🔄 Bulk operations plan:');
-      console.log('➕ Add identnrs:', identnrsToAdd);
-      console.log('🗑️ Remove identnrs:', identnrsToRemove);
-      console.log('✏️ Update identnrs:', identnrsToUpdate);
+      console.log('🔄 Bulk operations plan:', {
+        add: identnrsToAdd,
+        remove: identnrsToRemove,
+        update: identnrsToUpdate,
+        hasChanges: identnrsToAdd.length > 0 || identnrsToRemove.length > 0 || identnrsToUpdate.length > 0
+      });
 
       // 1. Create new records for added identnrs
       // Use the same position as the existing group to ensure they stay grouped together
@@ -677,7 +714,7 @@ export default function Home() {
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            identnrs: [...originalIdentnrs, ...identnrsToAdd] // Include both original and new identnrs
+            identnrs: identnrsToAdd // Only new identnrs to avoid duplicates
           })
         });
 
@@ -693,7 +730,13 @@ export default function Home() {
         });
 
         if (!deleteResponse.ok) {
-          throw new Error(`Failed to delete records for identnr: ${identnr}`);
+          // 404 is acceptable - identnr might already be deleted or not exist
+          if (deleteResponse.status !== 404) {
+            const errorText = await deleteResponse.text();
+            console.error(`❌ Delete failed for identnr ${identnr}:`, errorText);
+            throw new Error(`Failed to delete records for identnr: ${identnr}`);
+          }
+          console.log(`⚠️ No records found for identnr ${identnr} (already deleted or non-existent)`);
         }
       }
 
@@ -706,8 +749,8 @@ export default function Home() {
           console.log('📊 Similar data response:', similarData);
 
           if (similarData.success && similarData.data) {
-            // Ensure data is an array
-            const records = Array.isArray(similarData.data) ? similarData.data : [similarData.data];
+            // Get records array from the response structure
+            const records = similarData.data.records || [];
             console.log('📊 Records to process:', records);
 
             // Update each related record
@@ -716,25 +759,35 @@ export default function Home() {
               if (identnrsToUpdate.includes(record.identnr)) {
                 console.log(`🔄 Updating record ID ${record.id} for identnr ${record.identnr}`);
 
+                const updateData = {
+                  identnr: record.identnr, // Add required identnr field
+                  merkmal: formData.merkmal,
+                  auspraegung: formData.auspraegung,
+                  drucktext: formData.drucktext,
+                  sondermerkmal: formData.sondermerkmal || '',
+                  position: formData.position ? parseInt(formData.position) : 0,
+                  sonderAbt: parseInt(formData.sonderAbt) || 0,
+                  fertigungsliste: parseInt(formData.fertigungsliste) || 0
+                };
+
+                console.log(`📤 Sending update for record ${record.id}:`, updateData);
+
                 const updateResponse = await fetch(`${API_BASE}/${record.id}`, {
                   method: 'PUT',
                   headers: {
                     'Content-Type': 'application/json'
                   },
-                  body: JSON.stringify({
-                    merkmal: formData.merkmal,
-                    auspraegung: formData.auspraegung,
-                    drucktext: formData.drucktext,
-                    sondermerkmal: formData.sondermerkmal || '',
-                    position: formData.position ? parseInt(formData.position) : null,
-                    sonderAbt: parseInt(formData.sonderAbt) || 0,
-                    fertigungsliste: parseInt(formData.fertigungsliste) || 0
-                  })
+                  body: JSON.stringify(updateData)
                 });
 
                 if (!updateResponse.ok) {
+                  const errorText = await updateResponse.text();
+                  console.error(`❌ Update failed for record ${record.id}:`, errorText);
                   throw new Error(`Failed to update record ID: ${record.id}`);
                 }
+
+                const updateResult = await updateResponse.json();
+                console.log(`✅ Update successful for record ${record.id}:`, updateResult);
               }
             }
           }
@@ -898,7 +951,7 @@ export default function Home() {
           auspraegung: formData.auspraegung,
           drucktext: formData.drucktext,
           sondermerkmal: formData.sondermerkmal || '',
-          position: formData.position || '',
+          position: formData.position ? parseInt(formData.position) : 0,
           sonderAbt: formData.sonderAbt || '0',
           fertigungsliste: formData.fertigungsliste || '0'
         })
@@ -908,11 +961,20 @@ export default function Home() {
         throw new Error(`Failed to create record for ${firstIdentnr}`);
       }
 
+      const firstRecord = await firstResponse.json();
+      const recordId = firstRecord.data.id;
+
+      console.log('✅ First record created:', {
+        id: recordId,
+        identnr: firstIdentnr,
+        merkmal: formData.merkmal,
+        auspraegung: formData.auspraegung,
+        position: formData.position || 'empty',
+        allSelectedIdentnrs: selectedIdentnrs
+      });
+
       // If there are other identnrs, copy the first record to them
       if (otherIdentnrs.length > 0) {
-        const firstRecord = await firstResponse.json();
-        const recordId = firstRecord.data.id;
-
         const copyResponse = await fetch(`${API_BASE}/${recordId}/copy-to-identnrs`, {
           method: 'POST',
           headers: {
@@ -926,6 +988,14 @@ export default function Home() {
         if (!copyResponse.ok) {
           throw new Error(`Failed to copy record to other identnrs`);
         }
+
+        const copyResult = await copyResponse.json();
+        console.log('📋 Copy operation result:', {
+          originalRecordId: recordId,
+          targetIdentnrs: selectedIdentnrs,
+          copiedRecords: copyResult.data?.copiedRecords || 'No details returned',
+          totalCreated: selectedIdentnrs.length
+        });
       }
 
       // Success
@@ -1048,21 +1118,23 @@ export default function Home() {
         </div>
       </header>
 
-      <main className="app-main">
-        {error && (
-          <div className="error-message">
-            ❌ Fehler: {error}
-            <button onClick={fetchMerkmalstexte} className="btn-small btn-secondary" style={{marginLeft: '10px'}}>
-              🔄 Erneut versuchen
-            </button>
-          </div>
-        )}
+      {/* Fixed position toast notifications */}
+      {error && (
+        <div className="toast-message toast-error">
+          ❌ Fehler: {error}
+          <button onClick={fetchMerkmalstexte} className="btn-small btn-secondary" style={{marginLeft: '10px'}}>
+            🔄 Erneut versuchen
+          </button>
+        </div>
+      )}
 
-        {successMessage && (
-          <div className="success-message">
-            {successMessage}
-          </div>
-        )}
+      {successMessage && (
+        <div className="toast-message toast-success">
+          {successMessage}
+        </div>
+      )}
+
+      <main className="app-main">
 
         <FilterPanel
           showFilters={showFilters}
