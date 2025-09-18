@@ -134,8 +134,8 @@ const createMerkmalstext = async (req, res, next) => {
           console.log(`🔄 Position angepasst auf: ${finalPosition}`);
         }
 
-        // Shift existing positions up before inserting
-        await shiftPositionsUp(transaction, finalPosition);
+        // Position shifting disabled - allow duplicate positions
+        // await shiftPositionsUp(transaction, finalPosition);
       }
 
       const request = createRequest(transaction);
@@ -376,7 +376,8 @@ const deleteMerkmalstext = async (req, res, next) => {
       
       // LEGACY LOGIC: Shift positions down after deletion
       if (deleteResult.rowsAffected[0] > 0 && positionToDelete) {
-        await shiftPositionsDown(transaction, positionToDelete);
+        // Position shifting disabled - allow gaps in positions
+        // await shiftPositionsDown(transaction, positionToDelete);
       }
       
       return deleteResult;
@@ -592,8 +593,8 @@ const createMerkmalstextForIdentnr = async (req, res, next) => {
           console.log(`🔄 Position angepasst auf: ${finalPosition}`);
         }
 
-        // Shift existing positions up before inserting
-        await shiftPositionsUp(transaction, finalPosition);
+        // Position shifting disabled - allow duplicate positions
+        // await shiftPositionsUp(transaction, finalPosition);
       }
       
       const request = createRequest(transaction);

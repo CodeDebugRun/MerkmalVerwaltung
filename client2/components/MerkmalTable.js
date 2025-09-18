@@ -290,7 +290,7 @@ const MerkmalTable = ({
                     <div className="inline-edit-form">
                       <div className="inline-form-header">
                         <h4 style={{lineHeight: '1.5'}}>
-                          ✏️ Datensatz bearbeiten: {(() => {
+                          Datensatz bearbeiten: {(() => {
                             const identnrList = item._groupData?.identnr_list || item.identnr;
                             // Remove duplicates, clean up, and sort
                             const cleanAndSorted = identnrList.split(',')
