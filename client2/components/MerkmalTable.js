@@ -289,24 +289,35 @@ const MerkmalTable = ({
                   <td colSpan={showIdentnrColumn ? 9 : 8}>
                     <div className="inline-edit-form">
                       <div className="inline-form-header">
-                        <h4>✏️ Datensatz bearbeiten: {(() => {
-                          const identnrList = item._groupData?.identnr_list || item.identnr;
-                          console.log('🔍 Edit header identnr data:', {
-                            rawIdentnrList: identnrList,
-                            itemIdentnr: item.identnr,
-                            groupData: item._groupData
-                          });
-                          // Remove duplicates, clean up, and sort
-                          const cleanAndSortedList = identnrList.split(',')
-                            .map(id => id.trim())
-                            .filter((id, index, arr) => arr.indexOf(id) === index)
-                            .sort((a, b) => {
-                              // Natural sort for alphanumeric identnrs (T0001, T0002, etc.)
-                              return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
-                            })
-                            .join(',');
-                          return cleanAndSortedList;
-                        })()}</h4>
+                        <h4 style={{lineHeight: '1.5'}}>
+                          ✏️ Datensatz bearbeiten: {(() => {
+                            const identnrList = item._groupData?.identnr_list || item.identnr;
+                            // Remove duplicates, clean up, and sort
+                            const cleanAndSorted = identnrList.split(',')
+                              .map(id => id.trim())
+                              .filter((id, index, arr) => arr.indexOf(id) === index)
+                              .sort((a, b) => {
+                                // Natural sort for alphanumeric identnrs (T0001, T0002, etc.)
+                                return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+                              });
+
+                            // Break into lines with max 20 identnrs per line
+                            const lines = [];
+                            for (let i = 0; i < cleanAndSorted.length; i += 20) {
+                              lines.push(cleanAndSorted.slice(i, i + 20).join(','));
+                            }
+
+                            return (
+                              <div style={{display: 'inline'}}>
+                                {lines.map((line, index) => (
+                                  <div key={index} style={{marginTop: index > 0 ? '4px' : '0'}}>
+                                    {line}
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          })()}
+                        </h4>
                       </div>
                       <div className="inline-form-grid">
                         {/* Identnr Dropdown */}
@@ -329,9 +340,15 @@ const MerkmalTable = ({
                               {(() => {
                                 // Remove duplicates from selectedIdentnrs for count
                                 const uniqueIdentnrs = [...new Set(selectedIdentnrs)];
-                                return uniqueIdentnrs.length === 0
-                                  ? 'Ident-Nr. auswählen...'
-                                  : `${uniqueIdentnrs.length} Ident-Nr ausgewählt`;
+                                if (uniqueIdentnrs.length === 0) {
+                                  return 'Ident-Nr. auswählen...';
+                                } else if (uniqueIdentnrs.length <= 3) {
+                                  // Show actual identnrs if 3 or fewer
+                                  return uniqueIdentnrs.join(', ');
+                                } else {
+                                  // Show count if more than 3
+                                  return `${uniqueIdentnrs.length} Ident-Nr ausgewählt`;
+                                }
                               })()}
                             </span>
                             <span className="dropdown-arrow">{showInlineDropdown ? '▲' : '▼'}</span>
