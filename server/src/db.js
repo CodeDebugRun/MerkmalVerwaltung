@@ -14,7 +14,7 @@ const config = {
     idleTimeoutMillis: 30000
   },
   options: {
-    encrypt: true,
+    encrypt: false,
     trustServerCertificate: true, // Verhindert Zertifikatsfehler für localhost-Entwicklungsumgebung
     enableArithAbort: true
   }
@@ -39,7 +39,10 @@ const poolPromise = new sql.ConnectionPool(config)
     console.log('SQL Server\'a başarıyla bağlanıldı.');
     return pool;
   })
-  .catch(err => console.error('Veritabanı bağlantı hatası: ', err));
+  .catch(err => {
+    console.error('Veritabanı bağlantı hatası: ', err);
+    throw err; // Re-throw error to properly handle it
+  });
 
 
 module.exports = {

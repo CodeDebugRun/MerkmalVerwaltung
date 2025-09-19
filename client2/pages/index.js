@@ -21,7 +21,8 @@ export default function Home() {
   const [operationLoading, setOperationLoading] = useState({
     create: false,
     update: false,
-    delete: false
+    delete: false,
+    copy: false
   });
 
   // Pagination state
@@ -69,6 +70,10 @@ export default function Home() {
 
   // Settings state
   const [showSettings, setShowSettings] = useState(false);
+
+
+  // Copied group data state
+  const [copiedGroupData, setCopiedGroupData] = useState(null);
 
   // Form state
   const [showForm, setShowForm] = useState(false);
@@ -221,6 +226,7 @@ export default function Home() {
     const endIndex = startIndex + recordsPerPage;
     return sortedMerkmalstexte?.slice(startIndex, endIndex) || [];
   }, [sortedMerkmalstexte, currentPage, recordsPerPage]);
+
 
   // Fetch all identnrs from API
   const fetchAllIdentnrs = async () => {
@@ -810,6 +816,95 @@ export default function Home() {
     }
   };
 
+  // Group copy handler
+  const handleCopyGroupData = async (item) => {
+    try {
+      setOperationLoading(prev => ({ ...prev, copy: true }));
+
+      // Prepare copy request data
+      const copyData = {
+        merkmal: item.merkmal,
+        auspraegung: item.auspraegung,
+        drucktext: item.drucktext,
+        sondermerkmal: item.sondermerkmal === 'EMPTY' ? '' : item.sondermerkmal
+      };
+
+      // Call copy API
+      const response = await fetch(`${API_BASE}/copy-group`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(copyData)
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to copy group data: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      if (result.success) {
+        // Store copied data in localStorage or state for pasting later
+        const copiedGroupData = {
+          merkmal: result.data.merkmal,
+          auspraegung: result.data.auspraegung,
+          drucktext: result.data.drucktext,
+          sondermerkmal: result.data.sondermerkmal,
+          maka: result.data.maka,
+          fertigungsliste: result.data.fertigungsliste,
+          identnrList: result.data.identnrList,
+          recordCount: result.data.recordCount,
+          copiedAt: new Date().toISOString()
+        };
+
+        localStorage.setItem('copiedGroupData', JSON.stringify(copiedGroupData));
+
+        showSuccess(`✅ Gruppe erfolgreich kopiert (${result.data.recordCount} Datensätze)\n📋 Bereit zum Einfügen in "Neu Hinzufügen"`);
+      } else {
+        throw new Error(result.message || 'Failed to copy group data');
+      }
+
+    } catch (err) {
+      handleApiError(err, 'Fehler beim Kopieren der Gruppe');
+    } finally {
+      setOperationLoading(prev => ({ ...prev, copy: false }));
+    }
+  };
+
+  // Load group data from localStorage into form
+  const handleLoadGroupData = () => {
+    try {
+      const storedData = localStorage.getItem('copiedGroupData');
+      if (!storedData) {
+        showError('Keine kopierten Gruppendaten gefunden. Bitte kopieren Sie zuerst eine Gruppe aus der Tabelle.');
+        return;
+      }
+
+      const groupData = JSON.parse(storedData);
+      setCopiedGroupData(groupData);
+
+      // Fill form with copied data
+      setFormData(prev => ({
+        ...prev,
+        merkmal: groupData.merkmal,
+        auspraegung: groupData.auspraegung,
+        drucktext: groupData.drucktext,
+        sondermerkmal: groupData.sondermerkmal || '',
+        sonderAbt: groupData.maka || '0',
+        fertigungsliste: groupData.fertigungsliste || '0'
+      }));
+
+      // Set identnrs from copied group as selected
+      setSelectedIdentnrs(groupData.identnrList || []);
+
+      showSuccess(`📄 Gruppendaten erfolgreich geladen (${groupData.recordCount} Datensätze)\n✅ ${groupData.identnrList?.length || 0} Ident-Nr automatisch ausgewählt`);
+    } catch (err) {
+      console.error('Error loading group data:', err);
+      showError('Fehler beim Laden der Gruppendaten');
+    }
+  };
+
   // Filter handlers
   const handleFilterChange = (field, value) => {
     setFilterData(prev => ({ ...prev, [field]: value }));
@@ -1110,6 +1205,14 @@ export default function Home() {
 
             <button
               className="btn btn-info"
+              onClick={() => {}}
+              title="View Mode (Coming Soon)"
+            >
+              🏷️
+            </button>
+
+            <button
+              className="btn btn-info"
               onClick={() => setShowSettings(!showSettings)}
               title="Einstellungen"
             >
@@ -1172,6 +1275,7 @@ export default function Home() {
           filteredIdentnrs={filteredIdentnrs}
           originalRecord={editingItem}
           operationLoading={operationLoading}
+          copiedGroupData={copiedGroupData}
           onSubmit={handleFormSubmit}
           onInputChange={handleInputChange}
           onDropdownToggle={handleIdentnrDropdownToggle}
@@ -1180,6 +1284,7 @@ export default function Home() {
           onAddCustomIdentnr={handleAddCustomIdentnr}
           onToggleIdentnrSelection={handleToggleIdentnrSelection}
           onCancel={handleFormCancel}
+          onLoadGroupData={handleLoadGroupData}
         />
 
         <section className="data-section">
@@ -1226,6 +1331,7 @@ export default function Home() {
             onEdit={handleEdit}
             onDelete={handleDelete}
             onCopyToClipboard={copyToClipboard}
+            onCopyGroupData={handleCopyGroupData}
             onInputChange={handleInputChange}
             onResetForm={resetForm}
             onColumnFilterChange={handleColumnFilterChange}

@@ -196,6 +196,22 @@ a {
   transform: translateY(-1px);
 }
 
+.btn-copy {
+  background-color: transparent;
+  color: var(--text-secondary);
+  padding: 0.375rem 0.75rem;
+  font-size: 0.8rem;
+  margin-right: 0.25rem;
+  border: none;
+  transition: all 0.2s ease-in-out;
+}
+
+.btn-copy:hover {
+  background-color: var(--hover-bg);
+  color: var(--text-primary);
+  transform: translateY(-1px);
+}
+
 .btn-delete {
   background-color: transparent;
   color: var(--text-secondary);
@@ -533,6 +549,20 @@ a {
 
 .form-section h3 {
   margin: 0 0 20px 0;
+  color: var(--text-primary);
+  font-size: 1.3rem;
+  font-weight: 600;
+}
+
+.form-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.form-header h3 {
+  margin: 0;
   color: var(--text-primary);
   font-size: 1.3rem;
   font-weight: 600;

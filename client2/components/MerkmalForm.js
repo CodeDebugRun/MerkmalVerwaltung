@@ -10,6 +10,7 @@ const MerkmalForm = ({
   filteredIdentnrs,
   originalRecord,
   operationLoading,
+  copiedGroupData,
   onSubmit,
   onInputChange,
   onDropdownToggle,
@@ -17,7 +18,8 @@ const MerkmalForm = ({
   onCustomIdentnrKeyDown,
   onAddCustomIdentnr,
   onToggleIdentnrSelection,
-  onCancel
+  onCancel,
+  onLoadGroupData
 }) => {
   // Note: Click outside handling is now done in the main page component
 
@@ -27,7 +29,20 @@ const MerkmalForm = ({
 
   return (
     <section className="form-section">
-      <h3>{editingItem ? '✏️ Datensatz bearbeiten' : '➕ Neuen Datensatz hinzufügen'}</h3>
+      <div className="form-header">
+        <h3>{editingItem ? '✏️ Datensatz bearbeiten' : '➕ Neuen Datensatz hinzufügen'}</h3>
+        {!editingItem && (
+          <button
+            type="button"
+            className="btn btn-secondary btn-small"
+            onClick={onLoadGroupData}
+            disabled={operationLoading?.copy}
+            title="Merkmal Gruppe aus Tabelle kopieren"
+          >
+{operationLoading?.copy ? '⏳ Lädt...' : '📄 Merkmal Gruppe'}
+          </button>
+        )}
+      </div>
       <form onSubmit={onSubmit} className="data-form">
         <div className="form-row">
           {/* Multi-Select Ident-Nr Dropdown */}

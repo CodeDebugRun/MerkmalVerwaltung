@@ -1354,6 +1354,137 @@ const bulkDeleteByGroupData = async (req, res, next) => {
   }
 };
 
+// Copy group data for replication - get all records that match group criteria
+const copyGroupData = async (req, res, next) => {
+  const { merkmal, auspraegung, drucktext, sondermerkmal } = req.body;
+
+  // Validate required fields
+  if (!merkmal || !auspraegung || !drucktext) {
+    return res.status(400).json(formatValidationError(['Merkmal, Auspraegung und Drucktext sind erforderlich']));
+  }
+
+  try {
+    const pool = await poolPromise;
+
+    // Build WHERE clause for group matching
+    let whereClause = 'merkmal = @merkmal AND auspraegung = @auspraegung AND drucktext = @drucktext';
+
+    const request = pool.request()
+      .input('merkmal', sql.NVarChar, merkmal)
+      .input('auspraegung', sql.NVarChar, auspraegung)
+      .input('drucktext', sql.NVarChar, drucktext);
+
+    console.log('🔍 Copy Group Debug:', { merkmal, auspraegung, drucktext, sondermerkmal });
+
+    // Handle sondermerkmal (can be null, empty, or actual value) - match grouped query logic
+    if (sondermerkmal === null || sondermerkmal === undefined || sondermerkmal === '' || sondermerkmal === 'EMPTY') {
+      whereClause += ' AND (sondermerkmal IS NULL OR LTRIM(RTRIM(sondermerkmal)) = \'\')';
+    } else {
+      whereClause += ' AND sondermerkmal = @sondermerkmal';
+      request.input('sondermerkmal', sql.NVarChar, sondermerkmal);
+    }
+
+    const result = await request.query(`
+      SELECT
+        identnr, merkmal, auspraegung, drucktext, sondermerkmal,
+        merkmalsposition, maka, fertigungsliste
+      FROM merkmalstexte
+      WHERE ${whereClause}
+      ORDER BY identnr, merkmalsposition
+    `);
+
+    const groupData = result.recordset;
+
+    if (groupData.length === 0) {
+      return res.status(404).json(formatError('Keine Datensätze für diese Gruppenkombination gefunden'));
+    }
+
+    // Return copyable group template data
+    const copyableData = {
+      merkmal: groupData[0].merkmal,
+      auspraegung: groupData[0].auspraegung,
+      drucktext: groupData[0].drucktext,
+      sondermerkmal: groupData[0].sondermerkmal,
+      maka: groupData[0].maka,
+      fertigungsliste: groupData[0].fertigungsliste,
+      recordCount: groupData.length,
+      identnrList: [...new Set(groupData.map(r => r.identnr))].sort()
+    };
+
+    res.status(200).json(formatSuccess(copyableData, `Gruppendaten erfolgreich kopiert (${groupData.length} Datensätze)`));
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Create new group based on copied data
+const createGroupFromCopy = async (req, res, next) => {
+  const {
+    merkmal, auspraegung, drucktext, sondermerkmal,
+    maka, fertigungsliste, identnrList, merkmalsposition
+  } = req.body;
+
+  // Validate required fields
+  if (!merkmal || !auspraegung || !drucktext || !identnrList || !Array.isArray(identnrList)) {
+    return res.status(400).json(formatValidationError([
+      'Merkmal, Auspraegung, Drucktext und IdentnrList sind erforderlich'
+    ]));
+  }
+
+  if (identnrList.length === 0) {
+    return res.status(400).json(formatValidationError(['IdentnrList darf nicht leer sein']));
+  }
+
+  try {
+    const pool = await poolPromise;
+
+    // Use position 0 if not provided
+    const finalPosition = merkmalsposition ? parseInt(merkmalsposition) : 0;
+
+    const result = await withTransaction(pool, async (transaction) => {
+      const createdRecords = [];
+
+      // Create one record for each identnr in the list
+      for (const identnr of identnrList) {
+        if (!identnr || identnr.trim() === '') {
+          continue; // Skip empty identnr values
+        }
+
+        const request = createRequest(transaction);
+        const insertResult = await request
+          .input('identnr', sql.NVarChar, identnr.trim())
+          .input('merkmal', sql.NVarChar, merkmal)
+          .input('auspraegung', sql.NVarChar, auspraegung)
+          .input('drucktext', sql.NVarChar, drucktext)
+          .input('sondermerkmal', sql.NVarChar, (sondermerkmal === 'EMPTY' || !sondermerkmal) ? '' : sondermerkmal)
+          .input('merkmalsposition', sql.Int, finalPosition)
+          .input('maka', sql.Int, maka || 0)
+          .input('fertigungsliste', sql.Int, fertigungsliste || 0)
+          .query(`
+            INSERT INTO merkmalstexte (identnr, merkmal, auspraegung, drucktext, sondermerkmal, merkmalsposition, maka, fertigungsliste)
+            VALUES (@identnr, @merkmal, @auspraegung, @drucktext, @sondermerkmal, @merkmalsposition, @maka, @fertigungsliste);
+            SELECT * FROM merkmalstexte WHERE id = SCOPE_IDENTITY()
+          `);
+
+        if (insertResult.recordset && insertResult.recordset.length > 0) {
+          createdRecords.push(insertResult.recordset[0]);
+        }
+      }
+
+      return createdRecords;
+    });
+
+    res.status(201).json(formatSuccess({
+      createdRecords: result,
+      recordCount: result.length,
+      groupInfo: { merkmal, auspraegung, drucktext, sondermerkmal }
+    }, `${result.length} neue Datensätze aus kopierten Gruppendaten erstellt`));
+
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   getAllMerkmalstexte,
   getMerkmalstextById,
@@ -1375,5 +1506,7 @@ module.exports = {
   addCustomIdentnr,
   copyRecordToMultipleIdentnrs,
   getSimilarDatasets,
-  bulkDeleteByGroupData
+  bulkDeleteByGroupData,
+  copyGroupData,
+  createGroupFromCopy
 };

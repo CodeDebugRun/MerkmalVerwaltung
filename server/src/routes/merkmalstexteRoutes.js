@@ -57,6 +57,12 @@ router.delete('/merkmalstexte/:id', controller.deleteMerkmalstext);
 // POST: Bulk delete by group data
 router.post('/merkmalstexte/bulk-delete-group', controller.bulkDeleteByGroupData);
 
+// POST: Copy group data for replication
+router.post('/merkmalstexte/copy-group', controller.copyGroupData);
+
+// POST: Create new group from copied data
+router.post('/merkmalstexte/create-from-copy', controller.createGroupFromCopy);
+
 // GET: Get specific record by ID
 router.get('/merkmalstexte/:id', controller.getMerkmalstextById);
 

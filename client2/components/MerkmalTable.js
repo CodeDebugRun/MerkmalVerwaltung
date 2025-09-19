@@ -18,6 +18,7 @@ const MerkmalTable = ({
   onEdit,
   onDelete,
   onCopyToClipboard,
+  onCopyGroupData,
   onInputChange,
   onResetForm,
   onColumnFilterChange,
@@ -271,6 +272,13 @@ const MerkmalTable = ({
                       title="Bearbeiten"
                     >
                       {editingItem && editingItem.id === item.id ? '❌' : '✏️'}
+                    </button>
+                    <button
+                      className="btn-small btn-copy"
+                      onClick={() => onCopyGroupData(item)}
+                      title="Gruppe kopieren"
+                    >
+                      📋
                     </button>
                     <button
                       className="btn-small btn-delete"
