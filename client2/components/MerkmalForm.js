@@ -18,8 +18,7 @@ const MerkmalForm = ({
   onCustomIdentnrKeyDown,
   onAddCustomIdentnr,
   onToggleIdentnrSelection,
-  onCancel,
-  onLoadGroupData
+  onCancel
 }) => {
   // Note: Click outside handling is now done in the main page component
 
@@ -31,17 +30,6 @@ const MerkmalForm = ({
     <section className="form-section">
       <div className="form-header">
         <h3>{editingItem ? '✏️ Datensatz bearbeiten' : '➕ Neuen Datensatz hinzufügen'}</h3>
-        {!editingItem && (
-          <button
-            type="button"
-            className="btn btn-secondary btn-small"
-            onClick={onLoadGroupData}
-            disabled={operationLoading?.copy}
-            title="Merkmal Gruppe aus Tabelle kopieren"
-          >
-{operationLoading?.copy ? '⏳ Lädt...' : '📄 Merkmal Gruppe'}
-          </button>
-        )}
       </div>
       <form onSubmit={onSubmit} className="data-form">
         <div className="form-row">

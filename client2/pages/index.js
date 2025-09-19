@@ -860,7 +860,28 @@ export default function Home() {
 
         localStorage.setItem('copiedGroupData', JSON.stringify(copiedGroupData));
 
-        showSuccess(`✅ Gruppe erfolgreich kopiert (${result.data.recordCount} Datensätze)\n📋 Bereit zum Einfügen in "Neu Hinzufügen"`);
+        // Auto-load the copied data into form and open the form modal
+        setCopiedGroupData(copiedGroupData);
+
+        // Fill form with copied data
+        setFormData(prev => ({
+          ...prev,
+          merkmal: copiedGroupData.merkmal,
+          auspraegung: copiedGroupData.auspraegung,
+          drucktext: copiedGroupData.drucktext,
+          sondermerkmal: copiedGroupData.sondermerkmal || '',
+          sonderAbt: copiedGroupData.maka || '0',
+          fertigungsliste: copiedGroupData.fertigungsliste || '0'
+        }));
+
+        // Set identnrs from copied group as selected
+        setSelectedIdentnrs(copiedGroupData.identnrList || []);
+
+        // Open the form modal
+        setEditingItem(null); // Ensure we're in create mode
+        setShowForm(true);
+
+        showSuccess(`✅ Gruppe erfolgreich kopiert und bereit zum Einfügen!\n📄 ${copiedGroupData.recordCount} Datensätze • ${copiedGroupData.identnrList?.length || 0} Ident-Nr ausgewählt`);
       } else {
         throw new Error(result.message || 'Failed to copy group data');
       }
@@ -872,38 +893,6 @@ export default function Home() {
     }
   };
 
-  // Load group data from localStorage into form
-  const handleLoadGroupData = () => {
-    try {
-      const storedData = localStorage.getItem('copiedGroupData');
-      if (!storedData) {
-        showError('Keine kopierten Gruppendaten gefunden. Bitte kopieren Sie zuerst eine Gruppe aus der Tabelle.');
-        return;
-      }
-
-      const groupData = JSON.parse(storedData);
-      setCopiedGroupData(groupData);
-
-      // Fill form with copied data
-      setFormData(prev => ({
-        ...prev,
-        merkmal: groupData.merkmal,
-        auspraegung: groupData.auspraegung,
-        drucktext: groupData.drucktext,
-        sondermerkmal: groupData.sondermerkmal || '',
-        sonderAbt: groupData.maka || '0',
-        fertigungsliste: groupData.fertigungsliste || '0'
-      }));
-
-      // Set identnrs from copied group as selected
-      setSelectedIdentnrs(groupData.identnrList || []);
-
-      showSuccess(`📄 Gruppendaten erfolgreich geladen (${groupData.recordCount} Datensätze)\n✅ ${groupData.identnrList?.length || 0} Ident-Nr automatisch ausgewählt`);
-    } catch (err) {
-      console.error('Error loading group data:', err);
-      showError('Fehler beim Laden der Gruppendaten');
-    }
-  };
 
   // Filter handlers
   const handleFilterChange = (field, value) => {
@@ -1055,7 +1044,10 @@ export default function Home() {
       });
 
       if (!firstResponse.ok) {
-        throw new Error(`Failed to create record for ${firstIdentnr}`);
+        const errorData = await firstResponse.json();
+        const errorMessage = errorData.errors?.[0] || errorData.message || `Failed to create record for ${firstIdentnr}`;
+        setError(errorMessage);
+        return;
       }
 
       const firstRecord = await firstResponse.json();
@@ -1100,6 +1092,7 @@ export default function Home() {
       const identnrList = selectedIdentnrs.join(', ');
       showSuccess(`✅ ${count} Datensatz${count > 1 ? 'e' : ''} erfolgreich erstellt für: ${identnrList}`);
 
+      setError(''); // Clear any previous errors
       setShowForm(false);
       resetForm();
       setSelectedIdentnrs([]);
@@ -1225,10 +1218,24 @@ export default function Home() {
 
       {/* Fixed position toast notifications */}
       {error && (
-        <div className="toast-message toast-error">
+        <div className="toast-message toast-error" style={{position: 'relative', paddingRight: '3rem'}}>
           ❌ Fehler: {error}
-          <button onClick={fetchMerkmalstexte} className="btn-small btn-secondary" style={{marginLeft: '10px'}}>
-            🔄 Erneut versuchen
+          <button
+            onClick={() => setError('')}
+            style={{
+              position: 'absolute',
+              top: '8px',
+              right: '8px',
+              background: 'transparent',
+              border: 'none',
+              color: 'white',
+              fontSize: '16px',
+              cursor: 'pointer',
+              padding: '4px 8px',
+              borderRadius: '4px'
+            }}
+          >
+            ✕
           </button>
         </div>
       )}
@@ -1284,7 +1291,6 @@ export default function Home() {
           onAddCustomIdentnr={handleAddCustomIdentnr}
           onToggleIdentnrSelection={handleToggleIdentnrSelection}
           onCancel={handleFormCancel}
-          onLoadGroupData={handleLoadGroupData}
         />
 
         <section className="data-section">
