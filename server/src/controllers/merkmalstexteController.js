@@ -120,6 +120,29 @@ const createMerkmalstext = async (req, res, next) => {
   try {
     const pool = await poolPromise;
 
+    // Check for duplicate records with same identnr, merkmal, auspraegung, drucktext
+    const duplicateCheck = await pool.request()
+      .input('checkIdentnr', sql.VarChar, identnr)
+      .input('checkMerkmal', sql.VarChar, merkmal)
+      .input('checkAuspraegung', sql.VarChar, auspraegung)
+      .input('checkDrucktext', sql.VarChar, drucktext)
+      .input('checkSondermerkmal', sql.VarChar, sondermerkmal || '')
+      .query(`
+        SELECT COUNT(*) as count
+        FROM merkmalstexte
+        WHERE identnr = @checkIdentnr
+          AND merkmal = @checkMerkmal
+          AND auspraegung = @checkAuspraegung
+          AND drucktext = @checkDrucktext
+          AND sondermerkmal = @checkSondermerkmal
+      `);
+
+    if (duplicateCheck.recordset[0].count > 0) {
+      return res.status(400).json(formatValidationError([
+        `Ein Datensatz mit identischen Werten (Identnr: "${identnr}", Merkmal: "${merkmal}", Ausprägung: "${auspraegung}") existiert bereits.`
+      ]));
+    }
+
     // New logic: if position is provided, use it; if empty, use 0
     let finalPosition = position ? parseInt(position) : 0;
 
