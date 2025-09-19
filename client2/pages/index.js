@@ -4,6 +4,7 @@ import MerkmalTable from '../components/MerkmalTable';
 import FilterPanel from '../components/FilterPanel';
 import SettingsModal from '../components/SettingsModal';
 import MerkmalForm from '../components/MerkmalForm';
+import IdentnrCloneModal from '../components/IdentnrCloneModal';
 import { useDarkMode } from '../hooks/useDarkMode';
 
 export default function Home() {
@@ -71,6 +72,8 @@ export default function Home() {
   // Settings state
   const [showSettings, setShowSettings] = useState(false);
 
+  // Identnr clone modal state
+  const [showIdentnrCloneModal, setShowIdentnrCloneModal] = useState(false);
 
   // Copied group data state
   const [copiedGroupData, setCopiedGroupData] = useState(null);
@@ -105,6 +108,7 @@ export default function Home() {
 
   // API Base
   const API_BASE = 'http://localhost:3001/api/merkmalstexte';
+  const BASE_URL = 'http://localhost:3001/api';
 
   // Mock data for testing
   const mockData = [
@@ -905,6 +909,42 @@ export default function Home() {
     }
   };
 
+  // Handle identnr clone
+  const handleIdentnrClone = async ({ sourceIdentnr, targetIdentnr }) => {
+    try {
+      setOperationLoading(prev => ({ ...prev, clone: true }));
+
+      const response = await fetch(`${BASE_URL}/identnrs/clone`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ sourceIdentnr, targetIdentnr })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to clone identnr: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      if (result.success) {
+        showSuccess(`✅ Identnr erfolgreich geklont!\n📄 ${result.data.recordCount} neue Datensätze für "${targetIdentnr}" erfolgreich erstellt`);
+        setShowIdentnrCloneModal(false);
+
+        // Refresh data to show the new cloned records
+        await fetchMerkmalstexte();
+      } else {
+        throw new Error(result.message || 'Failed to clone identnr');
+      }
+
+    } catch (err) {
+      handleApiError(err, 'Fehler beim Klonen der Identnr');
+    } finally {
+      setOperationLoading(prev => ({ ...prev, clone: false }));
+    }
+  };
+
   // Filter handlers
   const handleFilterChange = (field, value) => {
     setFilterData(prev => ({ ...prev, [field]: value }));
@@ -1205,8 +1245,8 @@ export default function Home() {
 
             <button
               className="btn btn-info"
-              onClick={() => {}}
-              title="View Mode (Coming Soon)"
+              onClick={() => setShowIdentnrCloneModal(true)}
+              title="Identnr Klonen"
             >
               🏷️
             </button>
@@ -1263,6 +1303,14 @@ export default function Home() {
           darkMode={isDarkMode}
           onToggleDarkMode={handleToggleDarkMode}
           onClose={handleCloseSettings}
+        />
+
+        <IdentnrCloneModal
+          showModal={showIdentnrCloneModal}
+          allIdentnrs={allIdentnrs}
+          operationLoading={operationLoading}
+          onClose={() => setShowIdentnrCloneModal(false)}
+          onClone={handleIdentnrClone}
         />
 
         <MerkmalForm
