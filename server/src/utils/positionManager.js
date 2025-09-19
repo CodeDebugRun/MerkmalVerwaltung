@@ -124,9 +124,9 @@ const bulkUpdatePositions = async (transaction, identnr, merkmal, newPosition) =
     return;
   }
 
-  // Shift positions to make room for the bulk update
+  // Position shifting disabled - allow duplicate positions for bulk updates
   if (newPosition && newPosition > 0) {
-    await shiftPositionsUp(transaction, newPosition);
+    // await shiftPositionsUp(transaction, newPosition);
     
     // Update all records with same identnr + merkmal to sequential positions
     for (let i = 0; i < existingRecords.recordset.length; i++) {

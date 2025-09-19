@@ -763,8 +763,8 @@ const addCustomIdentnr = async (req, res, next) => {
         console.log(`🔄 Position angepasst auf: ${finalPosition}`);
       }
       
-      // Shift existing positions up before inserting
-      await shiftPositionsUp(transaction, finalPosition);
+      // Position shifting disabled - allow duplicate positions
+      // await shiftPositionsUp(transaction, finalPosition);
       
       const request = createRequest(transaction);
       
