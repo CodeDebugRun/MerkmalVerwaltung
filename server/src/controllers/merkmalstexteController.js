@@ -13,13 +13,6 @@ const {
   findNextSafePosition
 } = require('../utils/positionManager');
 
-
-
-
-
-
-
-
 // Bulk position editing - Legacy merkmalsposition_edit.jsp functionality
 const bulkUpdateMerkmalstextePositions = async (req, res, next) => {
   const { identnr, merkmal, newPosition } = req.body;
@@ -149,13 +142,6 @@ const checkDuplicateIdentnrs = async (req, res, next) => {
     next(err);
   }
 };
-
-
-
-
-
-
-
 
 // Advanced filtering endpoint - Legacy merkmalstexte.jsp functionality
 

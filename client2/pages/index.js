@@ -601,7 +601,7 @@ export default function Home() {
       return;
     }
     // Remove duplicates from identnr list for display
-    const rawIdentnrList = item._groupData?.identnr_list || identnr || '';
+    const rawIdentnrList = item._groupData?.identnr_list || item.identnr || '';
     const identnrList = rawIdentnrList ? rawIdentnrList.split(',').map(id => id.trim()).filter((id, index, arr) => arr.indexOf(id) === index).join(',') : '';
 
     console.log('🗑️ Delete operation started:', {
@@ -618,7 +618,7 @@ export default function Home() {
 
     const confirmMessage = recordCount > 1
       ? `Möchten Sie die gesamte Gruppe "${merkmal} - ${auspraegung}" mit ${recordCount} Datensätzen (Ident-Nr: ${identnrList}) wirklich löschen?`
-      : `Möchten Sie den Datensatz "${merkmal} - ${auspraegung}" (Ident-Nr: ${identnr}) wirklich löschen?`;
+      : `Möchten Sie den Datensatz "${merkmal} - ${auspraegung}" (Ident-Nr: ${item.identnr || identnrList}) wirklich löschen?`;
 
     if (!window.confirm(confirmMessage)) {
       return;
@@ -629,26 +629,20 @@ export default function Home() {
 
       let response;
 
-      if (recordCount === 1) {
-        // Single record delete - use individual endpoint
-        response = await fetch(`${API_BASE}/${id}`, {
-          method: 'DELETE'
-        });
-      } else {
-        // Multiple records delete - use bulk endpoint
-        response = await fetch(`${getApiUrl()}/grouped/merkmalstexte/bulk-delete-group`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            groupData: {
-              id_list: item._groupData.id_list,
-              groupId: item._groupData.groupId
-            }
-          })
-        });
-      }
+      // In grouped view, always use bulk endpoint (even for single record groups)
+      // because item.id is row number, not database ID
+      response = await fetch(`${getApiUrl()}/grouped/merkmalstexte/bulk-delete-group`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          groupData: {
+            id_list: item._groupData.id_list,
+            groupId: item._groupData.groupId
+          }
+        })
+      });
 
       if (!response.ok) {
         // 404 is acceptable - record might already be deleted
