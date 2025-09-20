@@ -15,6 +15,6 @@ router.get('/identnrs/:identnr', controller.getMerkmalstexteByIdentnr);
 router.post('/identnrs/clone', controller.cloneIdentnr);
 
 // Delete all records for a specific identnr
-router.delete('/identnrs/:identnr', controller.deleteIdentnr);
+router.delete('/identnrs/:identnr', controller.deleteMerkmalstexteByIdentnr);
 
 module.exports = router;
