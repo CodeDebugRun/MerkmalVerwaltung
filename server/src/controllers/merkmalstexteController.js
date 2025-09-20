@@ -547,40 +547,6 @@ const checkDuplicateIdentnrs = async (req, res, next) => {
   }
 };
 
-// Get all records by Ident-Nr
-const getMerkmalstexteByIdentnr = async (req, res, next) => {
-  const { identnr } = req.params;
-  
-  if (!identnr) {
-    return res.status(400).json(formatValidationError(['Ident-Nr ist erforderlich']));
-  }
-  
-  try {
-    const pool = await poolPromise;
-    
-    const result = await pool.request()
-      .input('identnr', sql.VarChar, identnr)
-      .query(`
-        SELECT * FROM merkmalstexte 
-        WHERE identnr = @identnr
-        ORDER BY merkmalsposition, merkmal
-      `);
-    
-    
-    // Felder für das Frontend zuordnen
-    const recordsWithMappedFields = result.recordset.map(record => ({
-      ...record,
-      position: record.merkmalsposition,
-      sonderAbt: record.maka,
-      fertigungsliste: record.fertigungsliste
-    }));
-    
-    res.status(200).json(formatSuccess(recordsWithMappedFields, 
-      `${result.recordset.length} Datensätze für Ident-Nr ${identnr} gefunden`));
-  } catch (err) {
-    next(err);
-  }
-};
 
 // Create new record for specific Ident-Nr
 const createMerkmalstextForIdentnr = async (req, res, next) => {
