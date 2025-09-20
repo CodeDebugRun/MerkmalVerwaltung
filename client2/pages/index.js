@@ -638,8 +638,8 @@ export default function Home() {
         },
         body: JSON.stringify({
           groupData: {
-            id_list: item._groupData.id_list,
-            groupId: item._groupData.groupId
+            id_list: item._groupData?.id_list || String(item.id),
+            groupId: item._groupData?.groupId || `single_${item.id}`
           }
         })
       });
@@ -761,13 +761,14 @@ export default function Home() {
       if (identnrsToAdd.length > 0) {
         console.log(`➕ Creating records for identnrs: ${identnrsToAdd.join(', ')} using bulk copy`);
 
-        const copyResponse = await fetch(`${API_BASE}/${editingItem.id}/copy-to-identnrs`, {
+        const copyResponse = await fetch(`${getApiUrl()}/grouped/merkmalstexte/create-from-copy`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            identnrs: identnrsToAdd // Only new identnrs to avoid duplicates
+            records: [formData], // Current form data as template
+            targetIdentnrs: identnrsToAdd // New identnrs to create
           })
         });
 
