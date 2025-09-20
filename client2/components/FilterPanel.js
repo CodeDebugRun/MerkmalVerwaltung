@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import IdentnrMultiSelect from './shared/IdentnrMultiSelect';
 
 const FilterPanel = ({
   showFilters,
@@ -30,80 +31,27 @@ const FilterPanel = ({
           {/* Multi-Select Ident-Nr Filter */}
           <div className="filter-group">
             <label>Ident-Nr</label>
-            <div className="multi-select-container">
-              <div
-                className="multi-select-header filter-input filter-identnr-dropdown-trigger"
-                onClick={onDropdownToggle}
-              >
-              {selectedFilterIdentnrs.length === 0
-                ? 'Ident-Nr. auswählen'
-                : `${selectedFilterIdentnrs[0]}`
-              }
-              <span className="dropdown-arrow">{showFilterIdentnrDropdown ? '▲' : '▼'}</span>
-            </div>
-
-            {showFilterIdentnrDropdown && (
-              <div className="multi-select-dropdown filter-identnr-dropdown-menu">
-                {/* Filter input for search */}
-                <div className="custom-input-container">
-                  <input
-                    type="text"
-                    placeholder="Ident-Nr suchen..."
-                    value={customFilterIdentnr}
-                    onChange={(e) => onCustomFilterIdentnrChange(e.target.value)}
-                    className="custom-identnr-input"
-                    autoFocus
-                  />
-                </div>
-
-                {/* Selected items summary */}
-                {selectedFilterIdentnrs.length > 0 && (
-                  <div className="selected-summary">
-                    <strong>Ausgewählt:</strong>
-                    <div className="selected-items">
-                      <span className="selected-tag">
-                        {selectedFilterIdentnrs[0]}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onRemoveFilterIdentnr();
-                          }}
-                          className="remove-tag-btn"
-                          title={`${selectedFilterIdentnrs[0]} entfernen`}
-                        >
-                          ×
-                        </button>
-                      </span>
-                    </div>
-                    <small style={{ color: '#8b949e', marginTop: '4px', display: 'block' }}>
-                      Hinweis: Nur eine Ident-Nr kann gleichzeitig gefiltert werden.
-                    </small>
-                  </div>
-                )}
-
-                {/* Existing options */}
-                {filteredFilterIdentnrs.length > 0 ? (
-                  filteredFilterIdentnrs.map(identnr => (
-                    <label key={identnr} className="multi-select-item">
-                      <input
-                        type="checkbox"
-                        checked={selectedFilterIdentnrs.includes(identnr)}
-                        onChange={() => onToggleFilterIdentnrSelection(identnr)}
-                        className="multi-select-checkbox"
-                      />
-                      <span className="multi-select-text">
-                        {identnr}
-                      </span>
-                    </label>
-                  ))
-                ) : (
-                  <div className="no-results">
-                    <em>Keine passenden Ident-Nr gefunden</em>
-                  </div>
-                )}
-              </div>
-            )}
+            <div style={{ position: 'relative' }}>
+              <IdentnrMultiSelect
+                selectedIdentnrs={selectedFilterIdentnrs}
+                allIdentnrs={filteredFilterIdentnrs}
+                showDropdown={showFilterIdentnrDropdown}
+                customIdentnr={customFilterIdentnr}
+                multiSelect={false}
+                placeholder="Ident-Nr. auswählen"
+                customInputPlaceholder="Ident-Nr suchen..."
+                showCustomInput={true}
+                searchMode={true}
+                maxDisplayItems={1}
+                triggerClassName="filter-input filter-identnr-dropdown-trigger"
+                dropdownClassName="filter-identnr-dropdown-menu"
+                showSelectedSummary={true}
+                singleSelectNote="Hinweis: Nur eine Ident-Nr kann gleichzeitig gefiltert werden."
+                onDropdownToggle={onDropdownToggle}
+                onCustomIdentnrChange={onCustomFilterIdentnrChange}
+                onToggleSelection={onToggleFilterIdentnrSelection}
+                onRemoveSelected={onRemoveFilterIdentnr}
+              />
             </div>
           </div>
 

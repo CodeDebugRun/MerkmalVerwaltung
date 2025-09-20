@@ -6,6 +6,8 @@ import SettingsModal from '../components/SettingsModal';
 import MerkmalForm from '../components/MerkmalForm';
 import IdentnrCloneModal from '../components/IdentnrCloneModal';
 import { useDarkMode } from '../hooks/useDarkMode';
+import { getSonderAbtDisplay } from '../utils/sonderAbtUtils';
+import { getApiUrl } from '../config/api';
 
 // Utility function to generate virtual groupId
 const generateGroupId = (merkmal, auspraegung, drucktext, identnrList) => {
@@ -119,8 +121,8 @@ export default function Home() {
   const [allIdentnrs, setAllIdentnrs] = useState([]); // Will load from API
 
   // API Base
-  const API_BASE = 'http://localhost:3001/api/merkmalstexte';
-  const BASE_URL = 'http://localhost:3001/api';
+  const API_BASE = getApiUrl('/merkmalstexte');
+  const BASE_URL = getApiUrl();
 
   // Mock data for testing
   const mockData = [
@@ -166,7 +168,7 @@ export default function Home() {
       setError('');
 
       // Try real API first - use grouped endpoint
-      const response = await fetch(`http://localhost:3001/api/grouped/merkmalstexte`);
+      const response = await fetch(`${getApiUrl()}/grouped/merkmalstexte`);
       const data = await response.json();
 
 
@@ -367,19 +369,6 @@ export default function Home() {
     setCustomInlineIdentnr('');
   };
 
-  const getSonderAbtDisplay = (value) => {
-    const sonderAbtMap = {
-      0: 'Keine',
-      1: '1 - schwarz',
-      2: '2 - blau',
-      3: '3 - rot',
-      4: '4 - orange',
-      5: '5 - grün',
-      6: '6 - weiss',
-      7: '7 - gelb'
-    };
-    return sonderAbtMap[value] || 'Unbekannt';
-  };
 
   const copyToClipboard = async (text, type) => {
     try {
@@ -645,7 +634,7 @@ export default function Home() {
         });
       } else {
         // Multiple records delete - use bulk endpoint
-        response = await fetch(`http://localhost:3001/api/grouped/merkmalstexte/bulk-delete-group`, {
+        response = await fetch(`${getApiUrl()}/grouped/merkmalstexte/bulk-delete-group`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
@@ -892,7 +881,7 @@ export default function Home() {
       };
 
       // Call copy API
-      const response = await fetch(`http://localhost:3001/api/grouped/merkmalstexte/copy-group`, {
+      const response = await fetch(`${getApiUrl()}/grouped/merkmalstexte/copy-group`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1456,7 +1445,6 @@ export default function Home() {
             onToggleIdentnrSelection={handleToggleInlineIdentnrSelection}
             onAddCustomIdentnr={handleAddCustomInlineIdentnr}
             onUpdateRecord={handleUpdateRecord}
-            getSonderAbtDisplay={getSonderAbtDisplay}
           />
 
           {/* Data Info */}

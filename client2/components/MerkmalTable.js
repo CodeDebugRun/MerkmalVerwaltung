@@ -1,4 +1,6 @@
 import React from 'react';
+import IdentnrMultiSelect from './shared/IdentnrMultiSelect';
+import { getSonderAbtDisplay } from '../utils/sonderAbtUtils';
 
 const MerkmalTable = ({
   data,
@@ -26,8 +28,7 @@ const MerkmalTable = ({
   onCustomIdentnrChange,
   onToggleIdentnrSelection,
   onAddCustomIdentnr,
-  onUpdateRecord,
-  getSonderAbtDisplay
+  onUpdateRecord
 }) => {
   if (!hasData || loading) {
     return null;
@@ -332,104 +333,24 @@ const MerkmalTable = ({
                       <div className="inline-form-grid">
                         {/* Identnr Dropdown */}
                         <div className="inline-form-input" style={{position: 'relative'}}>
-                          <div
-                            className="identnr-dropdown-trigger"
-                            onClick={onInlineDropdownToggle}
-                            style={{
-                              padding: '8px 12px',
-                              border: '1px solid #ddd',
-                              borderRadius: '4px',
-                              backgroundColor: '#fff',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              justifyContent: 'space-between',
-                              alignItems: 'center'
-                            }}
-                          >
-                            <span>
-                              {(() => {
-                                // Remove duplicates from selectedIdentnrs for count
-                                const uniqueIdentnrs = [...new Set(selectedIdentnrs)];
-                                if (uniqueIdentnrs.length === 0) {
-                                  return 'Ident-Nr. auswählen...';
-                                } else if (uniqueIdentnrs.length <= 3) {
-                                  // Show actual identnrs if 3 or fewer
-                                  return uniqueIdentnrs.join(', ');
-                                } else {
-                                  // Show count if more than 3
-                                  return `${uniqueIdentnrs.length} Ident-Nr ausgewählt`;
-                                }
-                              })()}
-                            </span>
-                            <span className="dropdown-arrow">{showInlineDropdown ? '▲' : '▼'}</span>
-                          </div>
-
-                          {showInlineDropdown && (
-                            <div
-                              className="identnr-dropdown-menu"
-                              style={{
-                                position: 'absolute',
-                                top: '100%',
-                                left: '0',
-                                right: '0',
-                                backgroundColor: '#fff',
-                                border: '1px solid #ddd',
-                                borderTop: 'none',
-                                borderRadius: '0 0 4px 4px',
-                                maxHeight: '200px',
-                                overflowY: 'auto',
-                                zIndex: 1000,
-                                boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-                              }}
-                            >
-                              {/* Custom input */}
-                              <div style={{padding: '8px', borderBottom: '1px solid #eee'}}>
-                                <input
-                                  type="text"
-                                  placeholder="Neue Ident-Nr eingeben..."
-                                  value={customIdentnr}
-                                  onChange={(e) => onCustomIdentnrChange(e.target.value)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter' && customIdentnr.trim()) {
-                                      e.preventDefault();
-                                      onAddCustomIdentnr();
-                                    }
-                                  }}
-                                  style={{
-                                    width: '100%',
-                                    padding: '4px 8px',
-                                    border: '1px solid #ddd',
-                                    borderRadius: '3px',
-                                    fontSize: '12px'
-                                  }}
-                                />
-                              </div>
-
-                              {/* Existing identnrs */}
-                              {allIdentnrs.map(identnr => (
-                                <label
-                                  key={identnr}
-                                  style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    padding: '6px 12px',
-                                    cursor: 'pointer',
-                                    fontSize: '12px'
-                                  }}
-                                  onMouseEnter={(e) => e.target.style.backgroundColor = '#f5f5f5'}
-                                  onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
-                                >
-                                  <input
-                                    type="checkbox"
-                                    checked={selectedIdentnrs.includes(identnr)}
-                                    onChange={() => onToggleIdentnrSelection(identnr)}
-                                    style={{marginRight: '8px'}}
-                                  />
-                                  {identnr}
-                                </label>
-                              ))}
-                            </div>
-                          )}
+                          <IdentnrMultiSelect
+                            selectedIdentnrs={selectedIdentnrs}
+                            allIdentnrs={allIdentnrs}
+                            showDropdown={showInlineDropdown}
+                            customIdentnr={customIdentnr}
+                            multiSelect={true}
+                            placeholder="Ident-Nr. auswählen..."
+                            customInputPlaceholder="Neue Ident-Nr eingeben..."
+                            showCustomInput={true}
+                            searchMode={false}
+                            maxDisplayItems={3}
+                            triggerClassName="identnr-dropdown-trigger"
+                            dropdownClassName="identnr-dropdown-menu"
+                            onDropdownToggle={onInlineDropdownToggle}
+                            onCustomIdentnrChange={onCustomIdentnrChange}
+                            onAddCustomIdentnr={onAddCustomIdentnr}
+                            onToggleSelection={onToggleIdentnrSelection}
+                          />
                         </div>
 
                         <input

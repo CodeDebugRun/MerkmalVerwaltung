@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
+import { getApiUrl } from '../config/api';
 
-const API_BASE_URL = 'http://localhost:3001/api';
+const API_BASE_URL = getApiUrl();
 
 export const usePagination = (endpoint = '/merkmalstexte', initialPageSize = 50, filters = {}) => {
   const [data, setData] = useState([]);

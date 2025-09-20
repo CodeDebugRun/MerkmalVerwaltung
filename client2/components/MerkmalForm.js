@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import IdentnrMultiSelect from './shared/IdentnrMultiSelect';
 
 const MerkmalForm = ({
   showForm,
@@ -34,85 +35,27 @@ const MerkmalForm = ({
       <form onSubmit={onSubmit} className="data-form">
         <div className="form-row">
           {/* Multi-Select Ident-Nr Dropdown */}
-          <div className="multi-select-container">
-            <div
-              className="multi-select-header form-input form-identnr-dropdown-trigger"
-              onClick={onDropdownToggle}
-            >
-              {selectedIdentnrs.length === 0
-                ? 'Ident-Nr. auswählen oder eingeben *'
-                : `${selectedIdentnrs.length} Ident-Nr ausgewählt (${selectedIdentnrs.join(', ')})`
-              }
-              <span className="dropdown-arrow">{showIdentnrDropdown ? '▲' : '▼'}</span>
-            </div>
-
-            {showIdentnrDropdown && (
-              <div className="multi-select-dropdown form-identnr-dropdown-menu">
-                {/* Custom input field */}
-                <div className="custom-input-container">
-                  <input
-                    type="text"
-                    placeholder="Neue Ident-Nr eingeben..."
-                    value={customIdentnr}
-                    onChange={(e) => onCustomIdentnrChange(e.target.value)}
-                    onKeyDown={onCustomIdentnrKeyDown}
-                    className="custom-identnr-input"
-                    autoFocus
-                  />
-                  {customIdentnr.trim() && (
-                    <button
-                      type="button"
-                      onClick={onAddCustomIdentnr}
-                      className="add-custom-btn"
-                      title="Hinzufügen"
-                    >
-                      ✓
-                    </button>
-                  )}
-                </div>
-
-                {/* Separator if there are existing options */}
-                {filteredIdentnrs.length > 0 && (
-                  <div className="dropdown-separator">
-                    <span>Bestehende Ident-Nr auswählen:</span>
-                  </div>
-                )}
-
-                {/* Existing options */}
-                {filteredIdentnrs.map(identnr => (
-                  <label key={identnr} className="multi-select-item">
-                    <input
-                      type="checkbox"
-                      checked={selectedIdentnrs.includes(identnr)}
-                      onChange={(e) => {
-                        e.stopPropagation();
-                        onToggleIdentnrSelection(identnr);
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                      className="multi-select-checkbox"
-                    />
-                    <span className="multi-select-text">
-                      {identnr}
-                      {editingItem && originalRecord?.identnr === identnr && (
-                        <span className="star-badge"> ⭐</span>
-                      )}
-                    </span>
-                    {editingItem && originalRecord?.identnr === identnr && (
-                      <span className="original-badge">Original</span>
-                    )}
-                  </label>
-                ))}
-
-                {/* No results message */}
-                {customIdentnr.trim() && filteredIdentnrs.length === 0 && (
-                  <div className="no-results">
-                    <em>Keine passenden Ident-Nr gefunden</em>
-                    <br />
-                    <small>Enter drücken um "{customIdentnr}" hinzuzufügen</small>
-                  </div>
-                )}
-              </div>
-            )}
+          <div style={{ position: 'relative' }}>
+            <IdentnrMultiSelect
+              selectedIdentnrs={selectedIdentnrs}
+              allIdentnrs={filteredIdentnrs}
+              showDropdown={showIdentnrDropdown}
+              customIdentnr={customIdentnr}
+              multiSelect={true}
+              placeholder="Ident-Nr. auswählen oder eingeben *"
+              customInputPlaceholder="Neue Ident-Nr eingeben..."
+              showCustomInput={true}
+              searchMode={false}
+              maxDisplayItems={3}
+              triggerClassName="form-input form-identnr-dropdown-trigger"
+              dropdownClassName="form-identnr-dropdown-menu"
+              originalIdentnr={editingItem ? originalRecord?.identnr : null}
+              onDropdownToggle={onDropdownToggle}
+              onCustomIdentnrChange={onCustomIdentnrChange}
+              onAddCustomIdentnr={onAddCustomIdentnr}
+              onToggleSelection={onToggleIdentnrSelection}
+              onCustomIdentnrKeyDown={onCustomIdentnrKeyDown}
+            />
           </div>
 
           {/* Merkmal Input */}
