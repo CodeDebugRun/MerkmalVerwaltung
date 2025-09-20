@@ -301,15 +301,15 @@ const MerkmalTable = ({
                       <div className="inline-form-header">
                         <h4 style={{lineHeight: '1.5'}}>
                           Datensatz bearbeiten: {(() => {
-                            const identnrList = item._groupData?.identnr_list || item.identnr;
+                            const identnrList = item._groupData?.identnr_list || item.identnr || '';
                             // Remove duplicates, clean up, and sort
-                            const cleanAndSorted = identnrList.split(',')
+                            const cleanAndSorted = identnrList ? identnrList.split(',')
                               .map(id => id.trim())
                               .filter((id, index, arr) => arr.indexOf(id) === index)
                               .sort((a, b) => {
                                 // Natural sort for alphanumeric identnrs (T0001, T0002, etc.)
                                 return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
-                              });
+                              }) : [];
 
                             // Break into lines with max 20 identnrs per line
                             const lines = [];

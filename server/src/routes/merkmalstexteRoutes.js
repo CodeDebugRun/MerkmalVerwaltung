@@ -55,19 +55,12 @@ router.patch('/merkmalstexte/:id', basicCrudController.patchMerkmalstext);
 // DELETE: Delete specific record
 router.delete('/merkmalstexte/:id', basicCrudController.deleteMerkmalstext);
 
-// POST: Bulk delete by group data
-router.post('/merkmalstexte/bulk-delete-group', controller.bulkDeleteByGroupData);
-
-// POST: Copy group data for replication
-router.post('/merkmalstexte/copy-group', controller.copyGroupData);
-
-// POST: Create new group from copied data
-router.post('/merkmalstexte/create-from-copy', controller.createGroupFromCopy);
+// Note: Group operations moved to groupedRoutes.js
 
 // GET: Get specific record by ID
 router.get('/merkmalstexte/:id', basicCrudController.getMerkmalstextById);
 
 // GET: Get similar datasets to a specific record
-router.get('/merkmalstexte/:id/similar', controller.getSimilarDatasets);
+router.get('/merkmalstexte/:id/similar', basicCrudController.getSimilarDatasets);
 
 module.exports = router;

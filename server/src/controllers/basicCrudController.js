@@ -337,11 +337,70 @@ const deleteMerkmalstext = async (req, res, next) => {
   }
 };
 
+// Funktion zum Abrufen ähnlicher Datensätze
+const getSimilarDatasets = async (req, res, next) => {
+  const { id } = req.params;
+
+  const validation = validateId(id);
+  if (!validation.isValid) {
+    return res.status(400).json(formatValidationError(validation.errors));
+  }
+
+  try {
+    const pool = await poolPromise;
+
+    // Get original record details
+    const originalRecord = await pool.request()
+      .input('id', sql.Int, id)
+      .query('SELECT merkmal, auspraegung, drucktext, sondermerkmal FROM merkmalstexte WHERE id = @id');
+
+    if (originalRecord.recordset.length === 0) {
+      return res.status(404).json(formatError(`Datensatz mit ID ${id} nicht gefunden`));
+    }
+
+    const { merkmal, auspraegung, drucktext, sondermerkmal } = originalRecord.recordset[0];
+
+    // Find all records with same dataset characteristics
+    const similarRecords = await pool.request()
+      .input('merkmal', sql.VarChar, merkmal)
+      .input('auspraegung', sql.VarChar, auspraegung)
+      .input('drucktext', sql.VarChar, drucktext)
+      .input('sondermerkmal', sql.VarChar, sondermerkmal || '')
+      .query(`
+        SELECT id, identnr, merkmal, auspraegung, drucktext, sondermerkmal, merkmalsposition, maka, fertigungsliste
+        FROM merkmalstexte
+        WHERE merkmal = @merkmal
+          AND auspraegung = @auspraegung
+          AND drucktext = @drucktext
+          AND ISNULL(sondermerkmal, '') = @sondermerkmal
+        ORDER BY identnr, merkmalsposition
+      `);
+
+    // Map fields for frontend
+    const recordsWithNewFields = similarRecords.recordset.map(record => ({
+      ...record,
+      position: record.merkmalsposition,
+      sonderAbt: record.maka,
+      fertigungsliste: record.fertigungsliste
+    }));
+
+    res.status(200).json(formatSuccess({
+      originalId: parseInt(id),
+      records: recordsWithNewFields,
+      count: recordsWithNewFields.length
+    }, `${recordsWithNewFields.length} ähnliche Datensätze gefunden`));
+
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   getAllMerkmalstexte,
   getMerkmalstextById,
   createMerkmalstext,
   updateMerkmalstext,
   patchMerkmalstext,
-  deleteMerkmalstext
+  deleteMerkmalstext,
+  getSimilarDatasets
 };

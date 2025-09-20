@@ -7,6 +7,18 @@ import MerkmalForm from '../components/MerkmalForm';
 import IdentnrCloneModal from '../components/IdentnrCloneModal';
 import { useDarkMode } from '../hooks/useDarkMode';
 
+// Utility function to generate virtual groupId
+const generateGroupId = (merkmal, auspraegung, drucktext, identnrList) => {
+  const combinedString = `${merkmal || ''}|${auspraegung || ''}|${drucktext || ''}|${(identnrList || []).sort().join(',')}`;
+  // Simple hash function (FNV-1a)
+  let hash = 2166136261;
+  for (let i = 0; i < combinedString.length; i++) {
+    hash = hash ^ combinedString.charCodeAt(i);
+    hash = hash * 16777619;
+  }
+  return (hash >>> 0).toString(16); // Convert to positive hex
+};
+
 export default function Home() {
   // Dark mode hook
   const { isDarkMode, toggleDarkMode } = useDarkMode();
@@ -159,7 +171,23 @@ export default function Home() {
 
 
       if (data.success) {
-        setMerkmalstexte(data.data.data || []);
+        // Add groupId to each group data
+        const processedData = (data.data.data || []).map(item => {
+          if (item._groupData && item._groupData.identnr_list) {
+            const identnrList = item._groupData.identnr_list.split(',').map(id => id.trim());
+            const groupId = generateGroupId(item.merkmal, item.auspraegung, item.drucktext, identnrList);
+            return {
+              ...item,
+              _groupData: {
+                ...item._groupData,
+                groupId: groupId
+              }
+            };
+          }
+          return item;
+        });
+
+        setMerkmalstexte(processedData);
         setTotalRecords(data.data.totalCount || 0);
       } else {
         // Fallback to mock data
@@ -573,9 +601,17 @@ export default function Home() {
   const handleDelete = async (item) => {
     const { id, identnr, merkmal, auspraegung, drucktext } = item;
     const recordCount = item._groupData?.record_count || 1;
+
+    // Handle ghost records - records that exist in frontend but not in backend
+    if (item._groupData && (!item._groupData.id_list || item._groupData.record_count === 0)) {
+      console.warn('👻 Ghost record detected - removing from frontend cache');
+      showSuccess(`✅ Geist-Datensatz entfernt`);
+      await fetchMerkmalstexte(); // Refresh data to remove ghost records
+      return;
+    }
     // Remove duplicates from identnr list for display
-    const rawIdentnrList = item._groupData?.identnr_list || identnr;
-    const identnrList = rawIdentnrList.split(',').map(id => id.trim()).filter((id, index, arr) => arr.indexOf(id) === index).join(',');
+    const rawIdentnrList = item._groupData?.identnr_list || identnr || '';
+    const identnrList = rawIdentnrList ? rawIdentnrList.split(',').map(id => id.trim()).filter((id, index, arr) => arr.indexOf(id) === index).join(',') : '';
 
     console.log('🗑️ Delete operation started:', {
       id,
@@ -584,7 +620,9 @@ export default function Home() {
       auspraegung,
       drucktext,
       recordCount,
-      identnrList
+      identnrList,
+      groupData: item._groupData,
+      fullItemKeys: Object.keys(item)
     });
 
     const confirmMessage = recordCount > 1
@@ -607,36 +645,48 @@ export default function Home() {
         });
       } else {
         // Multiple records delete - use bulk endpoint
-        response = await fetch(`${API_BASE}/bulk-delete-group`, {
+        response = await fetch(`http://localhost:3001/api/grouped/merkmalstexte/bulk-delete-group`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            merkmal: item.merkmal,
-            auspraegung: item.auspraegung,
-            drucktext: item.drucktext,
-            sondermerkmal: item.sondermerkmal,
-            position: item.position,
-            sonderAbt: item.sonderAbt,
-            fertigungsliste: item.fertigungsliste
+            groupData: {
+              id_list: item._groupData.id_list,
+              groupId: item._groupData.groupId
+            }
           })
         });
       }
 
       if (!response.ok) {
-        const errorData = await response.text();
-        console.error('Delete failed:', response.status, errorData);
-        throw new Error(`Delete failed: ${response.status} - ${errorData}`);
+        // 404 is acceptable - record might already be deleted
+        if (response.status === 404) {
+          console.warn('⚠️ Record already deleted or not found:', response.status);
+          // Continue with success flow
+        } else {
+          const errorData = await response.text();
+          console.error('Delete failed:', response.status, errorData);
+          throw new Error(`Delete failed: ${response.status} - ${errorData}`);
+        }
       }
 
-      const result = await response.json();
-      console.log('🔍 DELETE Response:', {
-        resultData: result.data,
-        backendDeletedCount: result.data?.deletedCount,
-        frontendRecordCount: recordCount
-      });
-      const deletedCount = result.data?.deletedCount || recordCount;
+      let result = null;
+      let deletedCount = recordCount;
+
+      if (response.ok) {
+        result = await response.json();
+        console.log('🔍 DELETE Response:', {
+          resultData: result.data,
+          backendDeletedCount: result.data?.deletedCount,
+          frontendRecordCount: recordCount
+        });
+        deletedCount = result.data?.deletedCount || recordCount;
+      } else if (response.status === 404) {
+        // For 404, assume 1 record was "deleted" (already gone)
+        deletedCount = 1;
+        console.log('🔍 DELETE 404 - assuming record already deleted');
+      }
 
       if (recordCount === 1) {
         showSuccess(`✅ Datensatz erfolgreich gelöscht`);
@@ -761,7 +811,9 @@ export default function Home() {
       // 3. Update existing records (bulk update all records with same merkmal/auspraegung/drucktext)
       if (identnrsToUpdate.length > 0) {
         // Use the getSimilarDatasets endpoint to get all related records
-        const similarResponse = await fetch(`${API_BASE}/${editingItem.id}/similar`);
+        // Use first real database ID from id_list
+        const firstRealId = editingItem._groupData?.id_list?.split(',')[0] || editingItem.id;
+        const similarResponse = await fetch(`${API_BASE}/${firstRealId}/similar`);
         if (similarResponse.ok) {
           const similarData = await similarResponse.json();
           console.log('📊 Similar data response:', similarData);
@@ -840,7 +892,7 @@ export default function Home() {
       };
 
       // Call copy API
-      const response = await fetch(`${API_BASE}/copy-group`, {
+      const response = await fetch(`http://localhost:3001/api/grouped/merkmalstexte/copy-group`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -856,14 +908,18 @@ export default function Home() {
 
       if (result.success) {
         // Store copied data in localStorage or state for pasting later
+        const groupCriteria = result.data.groupCriteria;
+        const records = result.data.records || [];
+        const firstRecord = records[0] || {};
+
         const copiedGroupData = {
-          merkmal: result.data.merkmal,
-          auspraegung: result.data.auspraegung,
-          drucktext: result.data.drucktext,
-          sondermerkmal: result.data.sondermerkmal,
-          maka: result.data.maka,
-          fertigungsliste: result.data.fertigungsliste,
-          identnrList: result.data.identnrList,
+          merkmal: groupCriteria.merkmal,
+          auspraegung: groupCriteria.auspraegung,
+          drucktext: groupCriteria.drucktext,
+          sondermerkmal: groupCriteria.sondermerkmal,
+          maka: firstRecord.maka || firstRecord.sonderAbt || 0,
+          fertigungsliste: firstRecord.fertigungsliste || 0,
+          identnrList: records.map(r => r.identnr),
           recordCount: result.data.recordCount,
           copiedAt: new Date().toISOString()
         };
