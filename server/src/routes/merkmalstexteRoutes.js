@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const controller = require('../controllers/merkmalstexteController');
+const basicCrudController = require('../controllers/basicCrudController');
 
 // --- CRUD Routen ---
 // GET: Gruplandırılmış ana liste - main listing with grouped data
@@ -10,7 +11,7 @@ router.get('/merkmalstexte/list-grouped', controller.getGroupedMerkmalstexte);
 router.get('/merkmalstexte/filter', controller.getFilteredMerkmalstexte);
 
 // GET: Alle Datensätze abrufen (READ)
-router.get('/merkmalstexte', controller.getAllMerkmalstexte);
+router.get('/merkmalstexte', basicCrudController.getAllMerkmalstexte);
 
 // GET: Check for null ID records
 router.get('/merkmalstexte/check/null-ids', controller.checkNullIds);
@@ -40,19 +41,19 @@ router.post('/merkmalstexte/identnr/:identnr', controller.createMerkmalstextForI
 router.delete('/merkmalstexte/identnr/:identnr', controller.deleteMerkmalstexteByIdentnr);
 
 // POST: Neuen Datensatz erstellen (CREATE) - with position shifting
-router.post('/merkmalstexte', controller.createMerkmalstext);
+router.post('/merkmalstexte', basicCrudController.createMerkmalstext);
 
 // POST: Bulk position update - Legacy merkmalsposition_edit.jsp functionality
 router.post('/merkmalstexte/bulk-position', controller.bulkUpdateMerkmalstextePositions);
 
 // PUT: Update specific record (full update)
-router.put('/merkmalstexte/:id', controller.updateMerkmalstext);
+router.put('/merkmalstexte/:id', basicCrudController.updateMerkmalstext);
 
 // PATCH: Partial update specific record
-router.patch('/merkmalstexte/:id', controller.patchMerkmalstext);
+router.patch('/merkmalstexte/:id', basicCrudController.patchMerkmalstext);
 
 // DELETE: Delete specific record
-router.delete('/merkmalstexte/:id', controller.deleteMerkmalstext);
+router.delete('/merkmalstexte/:id', basicCrudController.deleteMerkmalstext);
 
 // POST: Bulk delete by group data
 router.post('/merkmalstexte/bulk-delete-group', controller.bulkDeleteByGroupData);
@@ -64,7 +65,7 @@ router.post('/merkmalstexte/copy-group', controller.copyGroupData);
 router.post('/merkmalstexte/create-from-copy', controller.createGroupFromCopy);
 
 // GET: Get specific record by ID
-router.get('/merkmalstexte/:id', controller.getMerkmalstextById);
+router.get('/merkmalstexte/:id', basicCrudController.getMerkmalstextById);
 
 // GET: Get similar datasets to a specific record
 router.get('/merkmalstexte/:id/similar', controller.getSimilarDatasets);

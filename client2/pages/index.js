@@ -522,14 +522,19 @@ export default function Home() {
         sonderAbt: '',
         fertigungsliste: ''
       });
+
+      // Reset page and reload grouped data
       setCurrentPage(1);
+
+      // Reload original grouped data to clear any search results
+      fetchMerkmalstexte();
 
       // Close any open editing modals when filters are cleared
       if (editingItem) {
         resetForm();
       }
 
-      console.log('🗑️ Column Filters Cleared - Showing all records:', merkmalstexte.length);
+      console.log('🗑️ Column Filters Cleared - Returning to grouped view');
 
     } else {
       // Just update input values, don't apply filtering yet
