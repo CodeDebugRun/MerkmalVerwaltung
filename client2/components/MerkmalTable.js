@@ -273,13 +273,15 @@ const MerkmalTable = ({
                     >
                       {editingItem && editingItem.id === item.id ? '❌' : '✏️'}
                     </button>
-                    <button
-                      className="btn-small btn-copy"
-                      onClick={() => onCopyGroupData(item)}
-                      title="Gruppe kopieren"
-                    >
-                      📋
-                    </button>
+                    {item._groupData && (
+                      <button
+                        className="btn-small btn-copy"
+                        onClick={() => onCopyGroupData(item)}
+                        title="Gruppe kopieren"
+                      >
+                        📋
+                      </button>
+                    )}
                     <button
                       className="btn-small btn-delete"
                       onClick={() => onDelete(item)}

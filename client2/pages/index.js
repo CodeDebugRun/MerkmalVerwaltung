@@ -560,7 +560,8 @@ export default function Home() {
       const identnrs = item._groupData.identnr_list.split(',').map(id => id.trim());
       setSelectedInlineIdentnrs(identnrs);
     } else {
-      setSelectedInlineIdentnrs([]);
+      // For single record, set its identnr as selected
+      setSelectedInlineIdentnrs([item.identnr]);
     }
   };
 
