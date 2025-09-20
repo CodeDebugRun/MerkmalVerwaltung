@@ -2,13 +2,14 @@ const express = require('express');
 const router = express.Router();
 const controller = require('../controllers/merkmalstexteController');
 const basicCrudController = require('../controllers/basicCrudController');
+const filterController = require('../controllers/filterController');
 
 // --- CRUD Routen ---
 // GET: Gruplandırılmış ana liste - main listing with grouped data
 router.get('/merkmalstexte/list-grouped', controller.getGroupedMerkmalstexte);
 
 // GET: Filtered results - Legacy merkmalstexte.jsp functionality
-router.get('/merkmalstexte/filter', controller.getFilteredMerkmalstexte);
+router.get('/merkmalstexte/filter', filterController.getFilteredMerkmalstexte);
 
 // GET: Alle Datensätze abrufen (READ)
 router.get('/merkmalstexte', basicCrudController.getAllMerkmalstexte);
