@@ -6,6 +6,7 @@ import SettingsModal from '../components/SettingsModal';
 import MerkmalForm from '../components/MerkmalForm';
 import IdentnrCloneModal from '../components/IdentnrCloneModal';
 import { useDarkMode } from '../hooks/useDarkMode';
+import { useErrorHandler } from '../hooks/useErrorHandler';
 import { getSonderAbtDisplay } from '../utils/sonderAbtUtils';
 import { getApiUrl } from '../config/api';
 
@@ -25,10 +26,47 @@ export default function Home() {
   // Dark mode hook
   const { isDarkMode, toggleDarkMode } = useDarkMode();
 
+  // Mock data for fallback
+  const mockData = [
+    {
+      id: 1,
+      identnr: 'TEST001',
+      merkmal: 'Farbe',
+      auspraegung: 'Rot',
+      drucktext: 'Rot lackiert',
+      sondermerkmal: 'UV-beständig',
+      merkmalsposition: 1,
+      maka: 3,
+      fertigungsliste: 1
+    },
+    {
+      id: 2,
+      identnr: 'TEST002',
+      merkmal: 'Material',
+      auspraegung: 'Aluminium',
+      drucktext: 'Aluminium eloxiert',
+      sondermerkmal: '',
+      merkmalsposition: 2,
+      maka: 1,
+      fertigungsliste: 0
+    }
+  ];
+
+  // Error handling with fallback data
+  const {
+    error,
+    loading,
+    setError,
+    setLoading,
+    clearError,
+    safeApiCall
+  } = useErrorHandler({
+    fallbackData: mockData,
+    showFallback: true
+  });
+
   // Data state
   const [merkmalstexte, setMerkmalstexte] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
   const [totalRecords, setTotalRecords] = useState(0);
 
   // Core state
@@ -124,55 +162,17 @@ export default function Home() {
   const API_BASE = getApiUrl('/merkmalstexte');
   const BASE_URL = getApiUrl();
 
-  // Mock data for testing
-  const mockData = [
-    {
-      id: 1,
-      identnr: 'TEST001',
-      merkmal: 'Farbe',
-      auspraegung: 'Rot',
-      drucktext: 'Rot lackiert',
-      sondermerkmal: 'UV-beständig',
-      merkmalsposition: 1,
-      maka: 3,
-      fertigungsliste: 1
-    },
-    {
-      id: 2,
-      identnr: 'TEST002',
-      merkmal: 'Material',
-      auspraegung: 'Aluminium',
-      drucktext: 'Aluminium eloxiert',
-      sondermerkmal: '',
-      merkmalsposition: 2,
-      maka: 0,
-      fertigungsliste: 0
-    },
-    {
-      id: 3,
-      identnr: 'TEST003',
-      merkmal: 'Größe',
-      auspraegung: '100x200',
-      drucktext: 'Standardgröße 100x200mm',
-      sondermerkmal: 'Sondermaß',
-      merkmalsposition: 3,
-      maka: 1,
-      fertigungsliste: 1
-    }
-  ];
-
-  // Data fetching with fallback to mock data
+  // Data fetching with centralized error handling
   const fetchMerkmalstexte = async () => {
-    try {
-      setLoading(true);
-      setError('');
+    const result = await safeApiCall(
+      async () => {
+        const response = await fetch(`${getApiUrl()}/grouped/merkmalstexte`);
+        const data = await response.json();
 
-      // Try real API first - use grouped endpoint
-      const response = await fetch(`${getApiUrl()}/grouped/merkmalstexte`);
-      const data = await response.json();
+        if (!data.success) {
+          throw new Error('API returned unsuccessful response');
+        }
 
-
-      if (data.success) {
         // Add groupId to each group data
         const processedData = (data.data.data || []).map(item => {
           if (item._groupData && item._groupData.identnr_list) {
@@ -189,22 +189,22 @@ export default function Home() {
           return item;
         });
 
-        setMerkmalstexte(processedData);
-        setTotalRecords(data.data.totalCount || 0);
-      } else {
-        // Fallback to mock data
-        console.warn('API failed, using mock data');
+        return { processedData, totalCount: data.data.totalCount || 0 };
+      },
+      'Fetch Merkmalstexte',
+      (result) => {
+        // Success callback
+        setMerkmalstexte(result.processedData);
+        setTotalRecords(result.totalCount);
+      },
+      () => {
+        // Error callback - fallback to mock data
         setMerkmalstexte(mockData);
-        setError('⚠️ Demo-Modus: Verwende Testdaten (Database nicht verfügbar)');
+        setTotalRecords(mockData.length);
       }
-    } catch (err) {
-      // Fallback to mock data
-      console.warn('Connection failed, using mock data:', err.message);
-      setMerkmalstexte(mockData);
-      setError('⚠️ Demo-Modus: Verwende Testdaten (Server nicht erreichbar)');
-    } finally {
-      setLoading(false);
-    }
+    );
+
+    return result;
   };
 
   // Computed values
@@ -264,20 +264,21 @@ export default function Home() {
 
   // Fetch all identnrs from API
   const fetchAllIdentnrs = async () => {
-    try {
-      const response = await fetch(`${API_BASE}/list/identnrs`);
-      const data = await response.json();
+    return await safeApiCall(
+      async () => {
+        const response = await fetch(`${API_BASE}/list/identnrs`);
+        const data = await response.json();
 
-      if (data.success) {
-        setAllIdentnrs(data.data || []);
-      } else {
-        console.warn('Failed to fetch identnrs, using empty array');
-        setAllIdentnrs([]);
-      }
-    } catch (err) {
-      console.warn('Error fetching identnrs:', err.message);
-      setAllIdentnrs([]);
-    }
+        if (!data.success) {
+          throw new Error('API returned unsuccessful response');
+        }
+
+        return data.data || [];
+      },
+      'Fetch All Identnrs',
+      (identnrs) => setAllIdentnrs(identnrs),
+      () => setAllIdentnrs([])
+    );
   };
 
   // Initialize data and settings
@@ -346,10 +347,11 @@ export default function Home() {
     }, 5000);
   };
 
+  // Use shared error handler instead of custom function
   const handleApiError = (err, defaultMessage) => {
     const message = err.response?.data?.message || err.message || defaultMessage;
+    setError(message);
     console.error(message, err);
-    alert(message);
   };
 
   const resetForm = () => {
