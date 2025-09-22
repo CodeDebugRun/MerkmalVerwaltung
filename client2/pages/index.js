@@ -258,6 +258,7 @@ export default function Home() {
     });
   }, [filteredMerkmalstexte, sortConfig]);
 
+
   // Use frontend pagination hook
   const pagination = useFrontendPagination(sortedMerkmalstexte || [], recordsPerPage);
   const {
