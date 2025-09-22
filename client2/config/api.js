@@ -19,6 +19,13 @@ export const getApiUrl = (endpoint = '') => {
   return `${API_CONFIG.BASE_URL}${endpoint}`;
 };
 
+// Helper function to build API URLs with cache busting for refresh operations
+export const getApiUrlWithCacheBust = (endpoint = '') => {
+  const url = `${API_CONFIG.BASE_URL}${endpoint}`;
+  const separator = url.includes('?') ? '&' : '?';
+  return `${url}${separator}t=${Date.now()}`;
+};
+
 // Default fetch configuration
 export const DEFAULT_FETCH_CONFIG = {
   headers: {

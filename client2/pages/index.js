@@ -8,7 +8,7 @@ import IdentnrCloneModal from '../components/IdentnrCloneModal';
 import { useDarkMode } from '../hooks/useDarkMode';
 import { useErrorHandler } from '../hooks/useErrorHandler';
 import { getSonderAbtDisplay } from '../utils/sonderAbtUtils';
-import { getApiUrl } from '../config/api';
+import { getApiUrl, getApiUrlWithCacheBust } from '../config/api';
 
 // Utility function to generate virtual groupId
 const generateGroupId = (merkmal, auspraegung, drucktext, identnrList) => {
@@ -163,10 +163,18 @@ export default function Home() {
   const BASE_URL = getApiUrl();
 
   // Data fetching with centralized error handling
-  const fetchMerkmalstexte = async () => {
+  const fetchMerkmalstexte = async (forceRefresh = false) => {
     const result = await safeApiCall(
       async () => {
-        const response = await fetch(`${getApiUrl()}/grouped/merkmalstexte`);
+        const apiUrl = forceRefresh
+          ? getApiUrlWithCacheBust('/grouped/merkmalstexte')
+          : `${getApiUrl()}/grouped/merkmalstexte`;
+
+        const fetchOptions = forceRefresh
+          ? { cache: 'no-cache', headers: { 'Cache-Control': 'no-cache' } }
+          : {};
+
+        const response = await fetch(apiUrl, fetchOptions);
         const data = await response.json();
 
         if (!data.success) {
@@ -971,6 +979,9 @@ export default function Home() {
 
         // Refresh data to show the new cloned records
         await fetchMerkmalstexte();
+
+        // Also refresh identnr list for filter dropdown
+        await fetchAllIdentnrs();
       } else {
         throw new Error(result.message || 'Failed to clone identnr');
       }
@@ -1277,7 +1288,7 @@ export default function Home() {
 
             <button
               className="btn btn-info"
-              onClick={fetchMerkmalstexte}
+              onClick={() => fetchMerkmalstexte(true)}
               disabled={loading}
               title="Daten aktualisieren"
             >
