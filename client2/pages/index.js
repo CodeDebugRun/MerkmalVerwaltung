@@ -1262,7 +1262,7 @@ export default function Home() {
 
         <section className="data-section">
           <div className="data-header">
-            <h3>Merkmal Gruppen</h3>
+            <h3>{merkmalstexte && merkmalstexte.length > 0 && merkmalstexte[0].identnr ? 'Datensätze' : 'Merkmal Gruppen'}</h3>
             {!loading && (
               <p className="data-info">
                 {hasData
