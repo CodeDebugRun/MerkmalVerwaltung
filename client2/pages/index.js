@@ -222,7 +222,7 @@ export default function Home() {
 
     return merkmalstexte.filter(item => {
       return Object.entries(appliedColumnFilters).every(([field, filterValue]) => {
-        if (!filterValue) return true; // No filter applied for this field
+        if (!filterValue || !filterValue.toString().trim()) return true; // No filter applied or empty/whitespace only
 
         // Special handling for sonderAbt and fertigungsliste - exact match
         if (field === 'sonderAbt') {
@@ -235,9 +235,9 @@ export default function Home() {
           return itemFertigungsliste === filterValue;
         }
 
-        // Text search for other fields
-        const itemValue = item[field]?.toString().toLowerCase() || '';
-        return itemValue.includes(filterValue.toLowerCase());
+        // Text search for other fields (trim both values)
+        const itemValue = item[field]?.toString().trim().toLowerCase() || '';
+        return itemValue.includes(filterValue.toString().trim().toLowerCase());
       });
     });
   }, [merkmalstexte, appliedColumnFilters]);
@@ -901,14 +901,14 @@ export default function Home() {
       // Build query parameters
       const params = new URLSearchParams();
 
-      // Add filter parameters
-      if (filterData.merkmal) params.append('merkmal', filterData.merkmal);
-      if (filterData.auspraegung) params.append('auspraegung', filterData.auspraegung);
-      if (filterData.drucktext) params.append('drucktext', filterData.drucktext);
-      if (filterData.sondermerkmal) params.append('sondermerkmal', filterData.sondermerkmal);
-      if (filterData.position) params.append('position', filterData.position);
-      if (filterData.sonderAbt) params.append('sonderAbt', filterData.sonderAbt);
-      if (filterData.fertigungsliste) params.append('fertigungsliste', filterData.fertigungsliste);
+      // Add filter parameters (trim whitespace)
+      if (filterData.merkmal && filterData.merkmal.trim()) params.append('merkmal', filterData.merkmal.trim());
+      if (filterData.auspraegung && filterData.auspraegung.trim()) params.append('auspraegung', filterData.auspraegung.trim());
+      if (filterData.drucktext && filterData.drucktext.trim()) params.append('drucktext', filterData.drucktext.trim());
+      if (filterData.sondermerkmal && filterData.sondermerkmal.trim()) params.append('sondermerkmal', filterData.sondermerkmal.trim());
+      if (filterData.position && filterData.position.toString().trim()) params.append('position', filterData.position.toString().trim());
+      if (filterData.sonderAbt && filterData.sonderAbt.toString().trim()) params.append('sonderAbt', filterData.sonderAbt.toString().trim());
+      if (filterData.fertigungsliste && filterData.fertigungsliste.toString().trim()) params.append('fertigungsliste', filterData.fertigungsliste.toString().trim());
 
       // Add selected Ident-Nr if any
       if (selectedFilterIdentnrs.length > 0) {
