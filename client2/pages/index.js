@@ -9,6 +9,7 @@ import { useDarkMode } from '../hooks/useDarkMode';
 import { useErrorHandler } from '../hooks/useErrorHandler';
 import { getSonderAbtDisplay } from '../utils/sonderAbtUtils';
 import { getApiUrl, getApiUrlWithCacheBust } from '../config/api';
+import { useFrontendPagination } from '../hooks/useFrontendPagination';
 
 // Utility function to generate virtual groupId
 const generateGroupId = (merkmal, auspraegung, drucktext, identnrList) => {
@@ -78,9 +79,6 @@ export default function Home() {
     copy: false
   });
 
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageInput, setPageInput] = useState('');
   const recordsPerPage = 50;
 
   // Column filters state (for quick filtering in table headers)
@@ -260,14 +258,26 @@ export default function Home() {
     });
   }, [filteredMerkmalstexte, sortConfig]);
 
-  // Pagination logic (based on filtered data)
+  // Use frontend pagination hook
+  const pagination = useFrontendPagination(sortedMerkmalstexte || [], recordsPerPage);
+  const {
+    paginatedData: currentData,
+    currentPage,
+    pageInput,
+    totalPages,
+    handlePageChange,
+    handlePreviousPage,
+    handleNextPage,
+    handlePageInputChange,
+    handlePageInputSubmit,
+    handlePageInputKeyPress,
+    getPaginationNumbers,
+    resetToFirstPage,
+    displayInfo
+  } = pagination;
+
+  // Keep legacy variable for compatibility
   const filteredTotalRecords = sortedMerkmalstexte?.length || 0;
-  const totalPages = Math.ceil(filteredTotalRecords / recordsPerPage);
-  const currentData = React.useMemo(() => {
-    const startIndex = (currentPage - 1) * recordsPerPage;
-    const endIndex = startIndex + recordsPerPage;
-    return sortedMerkmalstexte?.slice(startIndex, endIndex) || [];
-  }, [sortedMerkmalstexte, currentPage, recordsPerPage]);
 
 
   // Fetch all identnrs from API
@@ -346,7 +356,6 @@ export default function Home() {
 
   // Utility functions
   const showSuccess = (message) => {
-    console.log('🎉 SUCCESS MESSAGE:', message);
     setSuccessMessage(message);
 
     // Auto-clear success message after 5 seconds
@@ -385,7 +394,7 @@ export default function Home() {
       await navigator.clipboard.writeText(text);
       showSuccess(`${type} erfolgreich kopiert: ${text}`);
     } catch (err) {
-      console.error('Failed to copy:', err);
+      // Copy failed - silently ignore
     }
   };
 
@@ -401,81 +410,7 @@ export default function Home() {
     }));
   };
 
-  // Pagination handlers
-  const handlePageChange = (newPage) => {
-    if (newPage >= 1 && newPage <= totalPages) {
-      setCurrentPage(newPage);
-    }
-  };
 
-  const handlePreviousPage = () => {
-    handlePageChange(currentPage - 1);
-  };
-
-  const handleNextPage = () => {
-    handlePageChange(currentPage + 1);
-  };
-
-  // Generate pagination numbers with ellipsis
-  const getPaginationNumbers = () => {
-    const numbers = [];
-    const delta = 2; // How many pages to show around current page
-
-    if (totalPages <= 7) {
-      // Show all pages if total is small
-      for (let i = 1; i <= totalPages; i++) {
-        numbers.push(i);
-      }
-    } else {
-      // Always show first page
-      numbers.push(1);
-
-      if (currentPage > delta + 2) {
-        numbers.push('...');
-      }
-
-      // Show pages around current page
-      const start = Math.max(2, currentPage - delta);
-      const end = Math.min(totalPages - 1, currentPage + delta);
-
-      for (let i = start; i <= end; i++) {
-        numbers.push(i);
-      }
-
-      if (currentPage < totalPages - delta - 1) {
-        numbers.push('...');
-      }
-
-      // Always show last page
-      if (totalPages > 1) {
-        numbers.push(totalPages);
-      }
-    }
-
-    return numbers;
-  };
-
-  // Handle page input
-  const handlePageInputChange = (value) => {
-    setPageInput(value);
-  };
-
-  const handlePageInputSubmit = (e) => {
-    e.preventDefault();
-    const pageNum = parseInt(pageInput);
-    if (pageNum >= 1 && pageNum <= totalPages) {
-      handlePageChange(pageNum);
-      setPageInput('');
-    } else {
-      alert(`Bitte geben Sie eine Seitenzahl zwischen 1 und ${totalPages} ein.`);
-    }
-  };
-
-  const handlePageInputKeyPress = (e) => {
-    if (e.key === 'Enter') {
-      handlePageInputSubmit(e);
-    }
-  };
 
   // Column filter handlers
   const handleColumnFilterChange = (field, value) => {
@@ -483,51 +418,13 @@ export default function Home() {
       // Apply filters - copy current inputs to applied filters
       const newFilters = { ...columnFilters };
       setAppliedColumnFilters(newFilters);
-      setCurrentPage(1);
+      resetToFirstPage();
 
       // Close any open editing modals when filters change
       if (editingItem) {
         resetForm();
       }
 
-      // Log filter results to console
-      console.log('🔍 Column Filter Applied:', newFilters);
-
-      // Use setTimeout to log results after state update
-      setTimeout(() => {
-        const currentPageData = filteredMerkmalstexte.slice(
-          (currentPage - 1) * recordsPerPage,
-          currentPage * recordsPerPage
-        );
-
-        console.log('📊 Filter Results:', {
-          totalRecords: merkmalstexte.length,
-          filteredRecords: filteredMerkmalstexte.length,
-          currentPage: currentPage,
-          recordsPerPage: recordsPerPage,
-          currentPageGroups: currentPageData.length
-        });
-
-        console.log('👥 Group Details:', {
-          groupCount: filteredMerkmalstexte.length,
-          currentPageGroups: currentPageData.map(group => ({
-            id: group.id,
-            merkmal: group.merkmal,
-            auspraegung: group.auspraegung,
-            drucktext: group.drucktext,
-            sondermerkmal: group.sondermerkmal,
-            position: group.position,
-            recordCount: group._groupData?.record_count || 1,
-            identnrList: group._groupData?.identnr_list || group.identnr,
-            idList: group._groupData?.id_list
-          })),
-          allFilteredGroups: filteredMerkmalstexte.map(group => ({
-            merkmal: group.merkmal,
-            auspraegung: group.auspraegung,
-            recordCount: group._groupData?.record_count || 1
-          }))
-        });
-      }, 0);
 
     } else if (field === 'clear') {
       // Clear all filters
@@ -551,7 +448,7 @@ export default function Home() {
       });
 
       // Reset page and reload grouped data
-      setCurrentPage(1);
+      resetToFirstPage();
 
       // Reload original grouped data to clear any search results
       fetchMerkmalstexte();
@@ -561,7 +458,6 @@ export default function Home() {
         resetForm();
       }
 
-      console.log('🗑️ Column Filters Cleared - Returning to grouped view');
 
     } else {
       // Just update input values, don't apply filtering yet
@@ -603,7 +499,6 @@ export default function Home() {
 
     // Handle ghost records - records that exist in frontend but not in backend
     if (item._groupData && (!item._groupData.id_list || item._groupData.record_count === 0)) {
-      console.warn('👻 Ghost record detected - removing from frontend cache');
       showSuccess(`✅ Geist-Datensatz entfernt`);
       await fetchMerkmalstexte(); // Refresh data to remove ghost records
       return;
@@ -612,17 +507,6 @@ export default function Home() {
     const rawIdentnrList = item._groupData?.identnr_list || item.identnr || '';
     const identnrList = rawIdentnrList ? rawIdentnrList.split(',').map(id => id.trim()).filter((id, index, arr) => arr.indexOf(id) === index).join(',') : '';
 
-    console.log('🗑️ Delete operation started:', {
-      id,
-      identnr: identnrList, // Use cleaned identnr list
-      merkmal,
-      auspraegung,
-      drucktext,
-      recordCount,
-      identnrList,
-      groupData: item._groupData,
-      fullItemKeys: Object.keys(item)
-    });
 
     const confirmMessage = recordCount > 1
       ? `Möchten Sie die gesamte Gruppe "${merkmal} - ${auspraegung}" mit ${recordCount} Datensätzen (Ident-Nr: ${identnrList}) wirklich löschen?`
@@ -655,8 +539,7 @@ export default function Home() {
       if (!response.ok) {
         // 404 is acceptable - record might already be deleted
         if (response.status === 404) {
-          console.warn('⚠️ Record already deleted or not found:', response.status);
-          // Continue with success flow
+          // Continue with success flow - record already deleted
         } else {
           const errorData = await response.text();
           console.error('Delete failed:', response.status, errorData);
@@ -669,16 +552,10 @@ export default function Home() {
 
       if (response.ok) {
         result = await response.json();
-        console.log('🔍 DELETE Response:', {
-          resultData: result.data,
-          backendDeletedCount: result.data?.deletedCount,
-          frontendRecordCount: recordCount
-        });
         deletedCount = result.data?.deletedCount || recordCount;
       } else if (response.status === 404) {
         // For 404, assume 1 record was "deleted" (already gone)
         deletedCount = 1;
-        console.log('🔍 DELETE 404 - assuming record already deleted');
       }
 
       if (recordCount === 1) {
@@ -733,13 +610,6 @@ export default function Home() {
 
       const currentIdentnrs = selectedInlineIdentnrs;
 
-      console.log('🔄 Update operation started:', {
-        editingItemId: editingItem.id,
-        originalIdentnrs,
-        currentIdentnrs,
-        formData,
-        groupData: editingItem._groupData
-      });
 
       // Remove duplicates from arrays before calculation
       const uniqueOriginalIdentnrs = [...new Set(originalIdentnrs)];
@@ -754,12 +624,6 @@ export default function Home() {
       // Find identnrs to update (in both lists)
       const identnrsToUpdate = uniqueCurrentIdentnrs.filter(id => uniqueOriginalIdentnrs.includes(id));
 
-      console.log('🔄 Bulk operations plan:', {
-        add: identnrsToAdd,
-        remove: identnrsToRemove,
-        update: identnrsToUpdate,
-        hasChanges: identnrsToAdd.length > 0 || identnrsToRemove.length > 0 || identnrsToUpdate.length > 0
-      });
 
       // 1. Create new records for added identnrs
       // Use the same position as the existing group to ensure they stay grouped together
@@ -767,7 +631,6 @@ export default function Home() {
 
       // Use bulk copy endpoint to ensure same position for all identnrs
       if (identnrsToAdd.length > 0) {
-        console.log(`➕ Creating records for identnrs: ${identnrsToAdd.join(', ')} using bulk copy`);
 
         const copyResponse = await fetch(`${getApiUrl()}/grouped/merkmalstexte/create-from-copy`, {
           method: 'POST',
@@ -798,7 +661,6 @@ export default function Home() {
             console.error(`❌ Delete failed for identnr ${identnr}:`, errorText);
             throw new Error(`Failed to delete records for identnr: ${identnr}`);
           }
-          console.log(`⚠️ No records found for identnr ${identnr} (already deleted or non-existent)`);
         }
       }
 
@@ -810,18 +672,15 @@ export default function Home() {
         const similarResponse = await fetch(`${API_BASE}/${firstRealId}/similar`);
         if (similarResponse.ok) {
           const similarData = await similarResponse.json();
-          console.log('📊 Similar data response:', similarData);
 
           if (similarData.success && similarData.data) {
             // Get records array from the response structure
             const records = similarData.data.records || [];
-            console.log('📊 Records to process:', records);
 
             // Update each related record
             for (const record of records) {
               // Only update if the identnr is in the selected list
               if (identnrsToUpdate.includes(record.identnr)) {
-                console.log(`🔄 Updating record ID ${record.id} for identnr ${record.identnr}`);
 
                 const updateData = {
                   identnr: record.identnr, // Add required identnr field
@@ -834,7 +693,6 @@ export default function Home() {
                   fertigungsliste: parseInt(formData.fertigungsliste) || 0
                 };
 
-                console.log(`📤 Sending update for record ${record.id}:`, updateData);
 
                 const updateResponse = await fetch(`${API_BASE}/${record.id}`, {
                   method: 'PUT',
@@ -849,9 +707,6 @@ export default function Home() {
                   console.error(`❌ Update failed for record ${record.id}:`, errorText);
                   throw new Error(`Failed to update record ID: ${record.id}`);
                 }
-
-                const updateResult = await updateResponse.json();
-                console.log(`✅ Update successful for record ${record.id}:`, updateResult);
               }
             }
           }
@@ -1055,7 +910,6 @@ export default function Home() {
         setError('Filter-Suche fehlgeschlagen');
       }
     } catch (err) {
-      console.error('Filter error:', err);
       setError('Fehler beim Filtern der Daten');
     } finally {
       setLoading(false);
@@ -1152,14 +1006,6 @@ export default function Home() {
       const firstRecord = await firstResponse.json();
       const recordId = firstRecord.data.id;
 
-      console.log('✅ First record created:', {
-        id: recordId,
-        identnr: firstIdentnr,
-        merkmal: formData.merkmal,
-        auspraegung: formData.auspraegung,
-        position: formData.position || 'empty',
-        allSelectedIdentnrs: selectedIdentnrs
-      });
 
       // If there are other identnrs, copy the first record to them
       if (otherIdentnrs.length > 0) {
@@ -1178,12 +1024,6 @@ export default function Home() {
         }
 
         const copyResult = await copyResponse.json();
-        console.log('📋 Copy operation result:', {
-          originalRecordId: recordId,
-          targetIdentnrs: selectedIdentnrs,
-          copiedRecords: copyResult.data?.copiedRecords || 'No details returned',
-          totalCreated: selectedIdentnrs.length
-        });
       }
 
       // Success
