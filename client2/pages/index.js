@@ -500,7 +500,12 @@ export default function Home() {
     // Handle ghost records - records that exist in frontend but not in backend
     if (item._groupData && (!item._groupData.id_list || item._groupData.record_count === 0)) {
       showSuccess(`✅ Geist-Datensatz entfernt`);
-      await fetchMerkmalstexte(); // Refresh data to remove ghost records
+      // Refresh data while preserving filter view state
+      if (showFilters) {
+        await handleFilterSearch();
+      } else {
+        await fetchMerkmalstexte();
+      }
       return;
     }
     // Remove duplicates from identnr list for display
@@ -564,7 +569,14 @@ export default function Home() {
         showSuccess(`✅ ${deletedCount} Datensätze der Gruppe erfolgreich gelöscht`);
       }
 
-      await fetchMerkmalstexte(); // Refresh data
+      // Refresh data while preserving filter view state
+      if (showFilters) {
+        // If filter modal is open, refresh filtered data
+        await handleFilterSearch();
+      } else {
+        // Otherwise refresh grouped data
+        await fetchMerkmalstexte();
+      }
     } catch (err) {
       handleApiError(err, 'Fehler beim Löschen');
     } finally {
@@ -718,7 +730,14 @@ export default function Home() {
       showSuccess(`✅ Bulk operation erfolgreich: ${identnrsToAdd.length} hinzugefügt, ${identnrsToRemove.length} gelöscht, ${identnrsToUpdate.length} aktualisiert`);
 
       resetForm();
-      await fetchMerkmalstexte(); // Refresh data
+      // Refresh data while preserving filter view state
+      if (showFilters) {
+        // If filter modal is open, refresh filtered data
+        await handleFilterSearch();
+      } else {
+        // Otherwise refresh grouped data
+        await fetchMerkmalstexte();
+      }
 
     } catch (err) {
       handleApiError(err, 'Fehler bei Bulk-Operation');
@@ -931,9 +950,10 @@ export default function Home() {
     setSelectedFilterIdentnrs([]);
     setCustomFilterIdentnr('');
 
-    // Reload all data
+    // Close filter panel and return to grouped view
+    setShowFilters(false);
     fetchMerkmalstexte();
-    showSuccess('🗑️ Filter gelöscht - Alle Daten geladen');
+    showSuccess('🗑️ Filter gelöscht - Zurück zur Gruppenansicht');
   };
 
   // Computed filter values
