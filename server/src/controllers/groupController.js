@@ -104,7 +104,7 @@ const getGroupedMerkmalstexte = async (req, res, next) => {
             g.normalized_sondermerkmal, g.normalized_fertigungsliste
         )
         SELECT
-          ROW_NUMBER() OVER (ORDER BY merkmalsposition ASC, merkmal ASC) as id,
+          ROW_NUMBER() OVER (ORDER BY merkmal ASC, auspraegung ASC, drucktext ASC) as id,
           merkmal,
           auspraegung,
           drucktext,
@@ -119,7 +119,7 @@ const getGroupedMerkmalstexte = async (req, res, next) => {
           identnr_list,
           id_list
         FROM GroupedWithCounts
-        ORDER BY merkmalsposition ASC, merkmal ASC
+        ORDER BY merkmal ASC, auspraegung ASC, drucktext ASC
       `);
 
     // Process the results to match frontend expectations
