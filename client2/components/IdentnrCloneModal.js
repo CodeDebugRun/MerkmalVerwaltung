@@ -5,7 +5,9 @@ const IdentnrCloneModal = ({
   allIdentnrs,
   operationLoading,
   onClose,
-  onClone
+  onClone,
+  errorMessage,
+  clearError
 }) => {
   const [sourceIdentnr, setSourceIdentnr] = useState('');
   const [targetIdentnr, setTargetIdentnr] = useState('');
@@ -17,8 +19,12 @@ const IdentnrCloneModal = ({
       setSourceIdentnr('');
       setTargetIdentnr('');
       setShowSourceDropdown(false);
+      // Only clear errors when modal first opens, not during re-renders
+      if (clearError && !errorMessage) {
+        clearError();
+      }
     }
-  }, [showModal]);
+  }, [showModal, clearError, errorMessage]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -165,8 +171,26 @@ const IdentnrCloneModal = ({
               />
             </div>
 
+            {/* Error Message */}
+            {errorMessage && (
+              <div style={{
+                backgroundColor: '#fee2e2',
+                padding: '1rem',
+                borderRadius: '0.5rem',
+                marginBottom: '1.5rem',
+                border: '1px solid #fca5a5'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ color: '#dc2626', fontSize: '1.1rem' }}>⚠️</span>
+                  <p style={{ margin: 0, color: '#dc2626', fontSize: '0.9rem', fontWeight: '500' }}>
+                    {errorMessage}
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Info Message */}
-            {sourceIdentnr && targetIdentnr && (
+            {sourceIdentnr && targetIdentnr && !errorMessage && (
               <div style={{
                 backgroundColor: 'var(--bg-tertiary)',
                 padding: '1rem',

@@ -124,6 +124,8 @@ export default function Home() {
 
   // Identnr clone modal state
   const [showIdentnrCloneModal, setShowIdentnrCloneModal] = useState(false);
+  const [cloneError, setCloneError] = useState(null);
+
 
   // Copied group data state
   const [copiedGroupData, setCopiedGroupData] = useState(null);
@@ -833,6 +835,7 @@ export default function Home() {
   const handleIdentnrClone = async ({ sourceIdentnr, targetIdentnr }) => {
     try {
       setOperationLoading(prev => ({ ...prev, clone: true }));
+      setCloneError(null); // Clear any previous errors
 
       const response = await fetch(`${BASE_URL}/identnrs/clone`, {
         method: 'POST',
@@ -842,15 +845,12 @@ export default function Home() {
         body: JSON.stringify({ sourceIdentnr, targetIdentnr })
       });
 
-      if (!response.ok) {
-        throw new Error(`Failed to clone identnr: ${response.status}`);
-      }
-
       const result = await response.json();
 
       if (result.success) {
         showSuccess(`✅ Identnr erfolgreich geklont!\n📄 ${result.data.recordCount} neue Datensätze für "${targetIdentnr}" erfolgreich erstellt`);
         setShowIdentnrCloneModal(false);
+        setCloneError(null);
 
         // Refresh data to show the new cloned records
         await fetchMerkmalstexte();
@@ -858,11 +858,21 @@ export default function Home() {
         // Also refresh identnr list for filter dropdown
         await fetchAllIdentnrs();
       } else {
-        throw new Error(result.message || 'Failed to clone identnr');
+        // Handle specific backend error messages
+        let userFriendlyMessage = result.message;
+
+        if (result.message && result.message.includes('hat bereits Datensätze')) {
+          userFriendlyMessage = `Die Ziel-Identnr "${targetIdentnr}" enthält bereits Datensätze. Bitte wählen Sie eine andere Identnr oder löschen Sie zunächst die bestehenden Datensätze.`;
+        } else if (result.message && result.message.includes('nicht gefunden')) {
+          userFriendlyMessage = `Die Quell-Identnr "${sourceIdentnr}" wurde nicht gefunden oder enthält keine Datensätze.`;
+        }
+
+        setCloneError(userFriendlyMessage);
       }
 
     } catch (err) {
-      handleApiError(err, 'Fehler beim Klonen der Identnr');
+      console.error('Clone error:', err);
+      setCloneError('Es ist ein unerwarteter Fehler beim Klonen aufgetreten. Bitte versuchen Sie es erneut.');
     } finally {
       setOperationLoading(prev => ({ ...prev, clone: false }));
     }
@@ -1236,8 +1246,13 @@ export default function Home() {
           showModal={showIdentnrCloneModal}
           allIdentnrs={allIdentnrs}
           operationLoading={operationLoading}
-          onClose={() => setShowIdentnrCloneModal(false)}
+          onClose={() => {
+            setShowIdentnrCloneModal(false);
+            setCloneError(null); // Clear error when closing modal
+          }}
           onClone={handleIdentnrClone}
+          errorMessage={cloneError}
+          clearError={() => setCloneError(null)}
         />
 
         <MerkmalForm
