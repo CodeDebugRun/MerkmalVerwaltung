@@ -3,9 +3,7 @@ const { formatSuccess, formatError, formatValidationError } = require('../utils/
 const { validateMerkmalstexte, validateId } = require('../utils/validation');
 const { withTransaction, createRequest } = require('../utils/transactionHelper');
 const {
-  getNextAvailablePosition,
-  validatePositionUniqueness,
-  findNextSafePosition
+  getNextAvailablePosition
 } = require('../utils/positionManager');
 
 // Get all unique Ident-Nr values (simple list)
@@ -139,14 +137,6 @@ const createMerkmalstextForIdentnr = async (req, res, next) => {
 
     // Execute within transaction for data integrity
     const result = await withTransaction(pool, async (transaction) => {
-      // Position validation and adjustment for non-zero positions
-      if (finalPosition !== 0) {
-        const isPositionUnique = await validatePositionUniqueness(transaction, finalPosition);
-        if (!isPositionUnique) {
-          finalPosition = await findNextSafePosition(transaction, finalPosition);
-          console.log(`🔄 Position angepasst auf: ${finalPosition}`);
-        }
-      }
 
       const request = createRequest(transaction);
 
@@ -251,13 +241,6 @@ const addCustomIdentnr = async (req, res, next) => {
     const result = await withTransaction(pool, async (transaction) => {
       // Get next available position
       let finalPosition = await getNextAvailablePosition(pool);
-
-      // Validate position uniqueness
-      const isPositionUnique = await validatePositionUniqueness(transaction, finalPosition);
-      if (!isPositionUnique) {
-        finalPosition = await findNextSafePosition(transaction, finalPosition);
-        console.log(`🔄 Position angepasst auf: ${finalPosition}`);
-      }
 
       const request = createRequest(transaction);
 

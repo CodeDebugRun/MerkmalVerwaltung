@@ -2,15 +2,10 @@ const { poolPromise, sql } = require('../db');
 const { formatSuccess, formatError, formatValidationError } = require('../utils/responseFormatter');
 const { validateMerkmalstexte, validateId } = require('../utils/validation');
 const { withTransaction, createRequest } = require('../utils/transactionHelper');
-const { 
-  shiftPositionsUp, 
-  shiftPositionsDown, 
-  reorderPositions, 
+const {
   bulkUpdatePositions,
-  getNextAvailablePosition, 
-  getCurrentPosition,
-  validatePositionUniqueness,
-  findNextSafePosition
+  getNextAvailablePosition,
+  getCurrentPosition
 } = require('../utils/positionManager');
 
 // Bulk position editing - Legacy merkmalsposition_edit.jsp functionality
