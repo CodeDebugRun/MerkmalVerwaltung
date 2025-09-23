@@ -4,7 +4,7 @@ export const API_CONFIG = {
   // Base URL for backend API
   BASE_URL: process.env.NODE_ENV === 'production'
     ? process.env.NEXT_PUBLIC_API_URL || 'https://your-production-api.com/api'
-    : 'https://localhost:3443/api',
+    : 'http://localhost:3001/api',
 
   // API endpoints
   ENDPOINTS: {
