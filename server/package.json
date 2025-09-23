@@ -19,5 +19,8 @@
     "helmet": "^8.1.0",
     "mssql": "^11.0.1",
     "nodemon": "^3.1.10"
+  },
+  "devDependencies": {
+    "selfsigned": "^3.0.1"
   }
 }
