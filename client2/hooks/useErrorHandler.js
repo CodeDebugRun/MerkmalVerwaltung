@@ -69,6 +69,37 @@ export const useErrorHandler = (options = {}) => {
     }
   }, [clearError, handleErrorWithContext]);
 
+  // Validate duplicate prevention for group copy
+  const validateDuplicatePrevention = useCallback((formData, selectedIdentnrs, copiedGroupData) => {
+    if (!copiedGroupData) {
+      return { isValid: true };
+    }
+
+    const isDataUnchanged = (
+      formData.merkmal === copiedGroupData.merkmal &&
+      formData.auspraegung === copiedGroupData.auspraegung &&
+      formData.drucktext === copiedGroupData.drucktext &&
+      formData.sondermerkmal === (copiedGroupData.sondermerkmal || '') &&
+      formData.position === (copiedGroupData.position?.toString() || '') &&
+      formData.sonderAbt === (copiedGroupData.maka?.toString() || '0') &&
+      formData.fertigungsliste === (copiedGroupData.fertigungsliste?.toString() || '0')
+    );
+
+    const areIdentnrsUnchanged = (
+      selectedIdentnrs.length === (copiedGroupData.identnrList?.length || 0) &&
+      selectedIdentnrs.every(id => copiedGroupData.identnrList?.includes(id)) &&
+      copiedGroupData.identnrList?.every(id => selectedIdentnrs.includes(id))
+    );
+
+    if (isDataUnchanged && areIdentnrsUnchanged) {
+      const errorMessage = '⚠️ Keine Änderungen vorgenommen!\n\nBitte ändern Sie mindestens einen Wert (Merkmal, Ausprägung, Drucktext, etc.) oder die Ident-Nr. Auswahl, bevor Sie die Daten speichern.';
+      setError(errorMessage);
+      return { isValid: false, message: errorMessage };
+    }
+
+    return { isValid: true };
+  }, [setError]);
+
   return {
     // State
     error,
@@ -80,6 +111,7 @@ export const useErrorHandler = (options = {}) => {
     clearError,
     handleError: handleErrorWithContext,
     executeWithErrorHandling,
-    safeApiCall
+    safeApiCall,
+    validateDuplicatePrevention
   };
 };

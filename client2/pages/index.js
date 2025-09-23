@@ -60,7 +60,8 @@ export default function Home() {
     setError,
     setLoading,
     clearError,
-    safeApiCall
+    safeApiCall,
+    validateDuplicatePrevention
   } = useErrorHandler({
     fallbackData: mockData,
     showFallback: true
@@ -823,7 +824,7 @@ export default function Home() {
         setEditingItem(null); // Ensure we're in create mode
         setShowForm(true);
 
-        showSuccess(`✅ Gruppe erfolgreich kopiert und bereit zum Einfügen!\n📄 ${copiedGroupData.recordCount} Datensätze • ${copiedGroupData.identnrList?.length || 0} Ident-Nr ausgewählt`);
+        showSuccess(`✅ Gruppe erfolgreich kopiert und bereit zum Einfügen!\n🏷️ ${copiedGroupData.identnrList?.length || 0} Ident-Nr ausgewählt (${copiedGroupData.recordCount} Datensätze)`);
       } else {
         throw new Error(result.message || 'Failed to copy group data');
       }
@@ -1005,6 +1006,12 @@ export default function Home() {
     // Validation
     if (!formData.merkmal || !formData.auspraegung || !formData.drucktext || selectedIdentnrs.length === 0) {
       alert('Bitte füllen Sie alle Pflichtfelder aus: Ident-Nr., Merkmal, Ausprägung und Drucktext');
+      return;
+    }
+
+    // Check for duplicate prevention
+    const duplicateValidation = validateDuplicatePrevention(formData, selectedIdentnrs, copiedGroupData);
+    if (!duplicateValidation.isValid) {
       return;
     }
 

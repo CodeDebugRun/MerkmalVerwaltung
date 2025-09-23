@@ -374,6 +374,27 @@ const createGroupFromCopy = async (req, res, next) => {
       // Create records for each target identnr
       for (const targetIdentnr of targetIdentnrs) {
         for (const record of records) {
+          // Check for exact duplicate before creating
+          const duplicateRequest = new sql.Request(transaction);
+          const duplicateCheck = await duplicateRequest
+            .input('identnr', sql.NVarChar, targetIdentnr)
+            .input('merkmal', sql.NVarChar, record.merkmal)
+            .input('auspraegung', sql.NVarChar, record.auspraegung)
+            .input('drucktext', sql.NVarChar, record.drucktext)
+            .query(`
+              SELECT COUNT(*) as count
+              FROM merkmalstexte
+              WHERE identnr = @identnr
+                AND merkmal = @merkmal
+                AND auspraegung = @auspraegung
+                AND drucktext = @drucktext
+            `);
+
+          if (duplicateCheck.recordset[0].count > 0) {
+            console.log(`⚠️ Skipping duplicate: ${targetIdentnr} - ${record.merkmal}/${record.auspraegung}/${record.drucktext}`);
+            continue; // Skip this record, continue with next
+          }
+
           const request = new sql.Request(transaction);
           const result = await request
             .input('identnr', sql.NVarChar, targetIdentnr)

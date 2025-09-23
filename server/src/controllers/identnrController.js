@@ -113,6 +113,27 @@ const createMerkmalstextForIdentnr = async (req, res, next) => {
   try {
     const pool = await poolPromise;
 
+    // Check for exact duplicate combination
+    const duplicateCheck = await pool.request()
+      .input('identnr', sql.NVarChar, identnr)
+      .input('merkmal', sql.NVarChar, merkmal)
+      .input('auspraegung', sql.NVarChar, auspraegung)
+      .input('drucktext', sql.NVarChar, drucktext)
+      .query(`
+        SELECT COUNT(*) as count
+        FROM merkmalstexte
+        WHERE identnr = @identnr
+          AND merkmal = @merkmal
+          AND auspraegung = @auspraegung
+          AND drucktext = @drucktext
+      `);
+
+    if (duplicateCheck.recordset[0].count > 0) {
+      return res.status(400).json(formatValidationError([
+        `Datensatz existiert bereits: Ident-Nr "${identnr}" mit der exakten Kombination Merkmal "${merkmal}", Ausprägung "${auspraegung}" und Drucktext "${drucktext}"`
+      ]));
+    }
+
     // Position logic: use provided position or default to 0
     let finalPosition = position ? parseInt(position) : 0;
 
@@ -400,6 +421,27 @@ const copyRecordToMultipleIdentnrs = async (req, res, next) => {
         // Skip if it's the same as original
         if (targetIdentnr === originalRecord.identnr) {
           continue;
+        }
+
+        // Check for exact duplicate before copying
+        const duplicateRequest = createRequest(transaction);
+        const duplicateCheck = await duplicateRequest
+          .input('identnr', sql.VarChar, targetIdentnr)
+          .input('merkmal', sql.VarChar, originalRecord.merkmal)
+          .input('auspraegung', sql.VarChar, originalRecord.auspraegung)
+          .input('drucktext', sql.VarChar, originalRecord.drucktext)
+          .query(`
+            SELECT COUNT(*) as count
+            FROM merkmalstexte
+            WHERE identnr = @identnr
+              AND merkmal = @merkmal
+              AND auspraegung = @auspraegung
+              AND drucktext = @drucktext
+          `);
+
+        if (duplicateCheck.recordset[0].count > 0) {
+          console.log(`⚠️ Skipping duplicate during copy: ${targetIdentnr} - ${originalRecord.merkmal}/${originalRecord.auspraegung}/${originalRecord.drucktext}`);
+          continue; // Skip this record, continue with next
         }
 
         const request = createRequest(transaction);

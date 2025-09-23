@@ -107,6 +107,27 @@ const createMerkmalstext = async (req, res, next) => {
   try {
     const pool = await poolPromise;
 
+    // Check for exact duplicate combination: same identnr + merkmal + auspraegung + drucktext
+    const duplicateCheck = await pool.request()
+      .input('identnr', sql.NVarChar, identnr)
+      .input('merkmal', sql.NVarChar, merkmal)
+      .input('auspraegung', sql.NVarChar, auspraegung)
+      .input('drucktext', sql.NVarChar, drucktext)
+      .query(`
+        SELECT COUNT(*) as count
+        FROM merkmalstexte
+        WHERE identnr = @identnr
+          AND merkmal = @merkmal
+          AND auspraegung = @auspraegung
+          AND drucktext = @drucktext
+      `);
+
+    if (duplicateCheck.recordset[0].count > 0) {
+      return res.status(400).json(formatValidationError([
+        `Datensatz existiert bereits: Ident-Nr "${identnr}" mit der exakten Kombination Merkmal "${merkmal}", Ausprägung "${auspraegung}" und Drucktext "${drucktext}"`
+      ]));
+    }
+
     // Simple position logic: use provided position or default to 0
     const finalPosition = position || 0;
 
