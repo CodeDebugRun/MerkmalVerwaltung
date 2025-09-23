@@ -759,7 +759,10 @@ export default function Home() {
         merkmal: item.merkmal,
         auspraegung: item.auspraegung,
         drucktext: item.drucktext,
-        sondermerkmal: item.sondermerkmal === 'EMPTY' ? '' : item.sondermerkmal
+        sondermerkmal: item.sondermerkmal === 'EMPTY' ? '' : item.sondermerkmal,
+        position: item.position,
+        sonderAbt: item.sonderAbt,
+        maka: item.maka
       };
 
       // Call copy API
