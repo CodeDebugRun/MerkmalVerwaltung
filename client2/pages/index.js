@@ -760,7 +760,7 @@ export default function Home() {
         auspraegung: item.auspraegung,
         drucktext: item.drucktext,
         sondermerkmal: item.sondermerkmal === 'EMPTY' ? '' : item.sondermerkmal,
-        position: item.position,
+        position: item.merkmalsposition,
         sonderAbt: item.sonderAbt,
         maka: item.maka
       };
@@ -791,6 +791,7 @@ export default function Home() {
           auspraegung: groupCriteria.auspraegung,
           drucktext: groupCriteria.drucktext,
           sondermerkmal: groupCriteria.sondermerkmal,
+          position: firstRecord.merkmalsposition || 0,
           maka: firstRecord.maka || firstRecord.sonderAbt || 0,
           fertigungsliste: firstRecord.fertigungsliste || 0,
           identnrList: records.map(r => r.identnr),
@@ -810,6 +811,7 @@ export default function Home() {
           auspraegung: copiedGroupData.auspraegung,
           drucktext: copiedGroupData.drucktext,
           sondermerkmal: copiedGroupData.sondermerkmal || '',
+          position: copiedGroupData.position || '',
           sonderAbt: copiedGroupData.maka || '0',
           fertigungsliste: copiedGroupData.fertigungsliste || '0'
         }));

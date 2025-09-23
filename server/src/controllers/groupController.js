@@ -290,10 +290,10 @@ const bulkDeleteByGroupData = async (req, res, next) => {
 
 // Funktion zum Kopieren von Gruppendaten für Replikation
 const copyGroupData = async (req, res, next) => {
-  const { merkmal, auspraegung, drucktext, sondermerkmal, position, sonderAbt, maka } = req.body;
+  const { merkmal, auspraegung, drucktext, sondermerkmal, position, sonderAbt } = req.body;
 
   console.log('🔍 Copy Group Debug:', {
-    merkmal, auspraegung, drucktext, sondermerkmal, position, sonderAbt, maka
+    merkmal, auspraegung, drucktext, sondermerkmal, position, sonderAbt
   });
 
   // Validation
@@ -312,7 +312,6 @@ const copyGroupData = async (req, res, next) => {
       .input('sondermerkmal', sql.NVarChar, sondermerkmal || '')
       .input('position', sql.Int, position)
       .input('sonderAbt', sql.Int, sonderAbt)
-      .input('maka', sql.Int, maka)
       .query(`
         SELECT * FROM merkmalstexte
         WHERE merkmal = @merkmal
@@ -323,9 +322,8 @@ const copyGroupData = async (req, res, next) => {
             (sondermerkmal IS NULL AND @sondermerkmal = '') OR
             (LTRIM(RTRIM(sondermerkmal)) = '' AND @sondermerkmal = '')
           )
-          AND position = @position
-          AND sonderAbt = @sonderAbt
-          AND maka = @maka
+          AND merkmalsposition = @position
+          AND (maka = @sonderAbt OR maka IS NULL)
         ORDER BY merkmalsposition, identnr
       `);
 
