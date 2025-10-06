@@ -305,8 +305,37 @@ export default function Home() {
 
   // Initialize data and settings
   useEffect(() => {
-    fetchMerkmalstexte();
-    fetchAllIdentnrs();
+    // Check if database settings exist
+    const checkDatabaseSettings = () => {
+      const savedSettings = localStorage.getItem('dbSettings');
+      if (!savedSettings) {
+        // No database settings found, open settings modal
+        setShowSettings(true);
+        showSuccess('⚠️ Bitte konfigurieren Sie zuerst die Datenbankverbindung');
+        return false;
+      }
+
+      try {
+        const parsed = JSON.parse(savedSettings);
+        // Check if essential fields are filled
+        if (!parsed.database || !parsed.username) {
+          setShowSettings(true);
+          showSuccess('⚠️ Datenbankeinstellungen unvollständig - bitte vervollständigen');
+          return false;
+        }
+        return true;
+      } catch (error) {
+        console.error('Error parsing database settings:', error);
+        setShowSettings(true);
+        return false;
+      }
+    };
+
+    // Only fetch data if database settings are configured
+    if (checkDatabaseSettings()) {
+      fetchMerkmalstexte();
+      fetchAllIdentnrs();
+    }
 
     // Dark mode is handled by the useDarkMode hook
   }, []);

@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const sql = require('mssql');
 const asyncHandler = require('../middleware/asyncHandler');
-const { success, error } = require('../utils/responseFormatter');
+const { formatSuccess: success, formatError: error } = require('../utils/responseFormatter');
 
 /**
  * Test database connection with provided credentials

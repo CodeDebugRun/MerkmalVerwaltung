@@ -10,7 +10,7 @@ const SettingsModal = ({
   // Database settings state
   const [dbSettings, setDbSettings] = useState({
     host: 'localhost',
-    port: '3001',
+    port: '1433',
     database: '',
     username: '',
     password: ''
@@ -51,7 +51,8 @@ const SettingsModal = ({
 
     try {
       // Test database connection
-      const apiUrl = `http://${dbSettings.host || 'localhost'}:${dbSettings.port || '3001'}/api/database/test`;
+      // API server is always on port 3001, dbSettings.port is for SQL Server
+      const apiUrl = `http://localhost:3001/api/database/test`;
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
