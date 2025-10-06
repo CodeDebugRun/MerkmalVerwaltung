@@ -12,13 +12,17 @@ const getPoolKey = (config) => {
 const dbConnectionMiddleware = async (req, res, next) => {
   try {
     // Get database config from request headers
-    const dbConfig = req.headers['x-db-config'];
+    // Express converts headers to lowercase
+    const dbConfig = req.headers['x-db-config'] || req.get('X-DB-Config');
 
     if (!dbConfig) {
       // If no config in headers, continue without database
+      console.log('No database config found in headers');
       req.dbPool = null;
       return next();
     }
+
+    console.log('Database config received:', dbConfig);
 
     // Parse the config
     const config = JSON.parse(dbConfig);

@@ -8,9 +8,9 @@ const getStoredApiUrl = () => {
       try {
         const parsed = JSON.parse(dbSettings);
         if (parsed.host) {
-          // If database settings exist, use them to construct API URL
-          const port = parsed.port || '3001';
-          return `http://${parsed.host}:${port}/api`;
+          // API server is always on port 3001, not the database port
+          // Database port (parsed.port) is for SQL Server connection
+          return `http://localhost:3001/api`;
         }
       } catch (e) {
         console.error('Error parsing stored database settings:', e);
@@ -38,12 +38,15 @@ export const API_CONFIG = {
 
 // Helper function to build full API URLs
 export const getApiUrl = (endpoint = '') => {
-  return `${API_CONFIG.BASE_URL}${endpoint}`;
+  // Always check for stored API URL dynamically
+  const storedUrl = getStoredApiUrl();
+  const baseUrl = storedUrl || API_CONFIG.BASE_URL;
+  return `${baseUrl}${endpoint}`;
 };
 
 // Helper function to build API URLs with cache busting for refresh operations
 export const getApiUrlWithCacheBust = (endpoint = '') => {
-  const url = `${API_CONFIG.BASE_URL}${endpoint}`;
+  const url = getApiUrl(endpoint);
   const separator = url.includes('?') ? '&' : '?';
   return `${url}${separator}t=${Date.now()}`;
 };
