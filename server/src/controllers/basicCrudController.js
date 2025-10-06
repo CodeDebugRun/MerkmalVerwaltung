@@ -1,4 +1,4 @@
-const { poolPromise, sql } = require('../db');
+const sql = require('mssql');
 const { formatSuccess, formatError, formatValidationError } = require('../utils/responseFormatter');
 const { validateMerkmalstexte, validateId } = require('../utils/validation');
 const { bulkUpdatePositions, getCurrentPosition } = require('../utils/positionManager');
@@ -6,7 +6,10 @@ const { bulkUpdatePositions, getCurrentPosition } = require('../utils/positionMa
 // Funktion zum Abrufen aller Datensätze (READ ALL) - mit Pagination-Unterstützung
 const getAllMerkmalstexte = async (req, res, next) => {
   try {
-    const pool = await poolPromise;
+    const pool = req.dbPool;
+    if (!pool) {
+      return res.status(500).json(formatError('Keine Datenbankverbindung verfügbar'));
+    }
 
     // Extract pagination parameters with defaults and validation
     const page = Math.max(1, parseInt(req.query.page) || 1);
@@ -70,7 +73,10 @@ const getMerkmalstextById = async (req, res, next) => {
   }
 
   try {
-    const pool = await poolPromise;
+    const pool = req.dbPool;
+    if (!pool) {
+      return res.status(500).json(formatError('Keine Datenbankverbindung verfügbar'));
+    }
     const result = await pool.request()
       .input('id', sql.Int, id)
       .query('SELECT * FROM merkmalstexte WHERE id = @id');
@@ -105,7 +111,10 @@ const createMerkmalstext = async (req, res, next) => {
   const { identnr, merkmal, auspraegung, drucktext, sondermerkmal, position, sonderAbt, fertigungsliste } = req.body;
 
   try {
-    const pool = await poolPromise;
+    const pool = req.dbPool;
+    if (!pool) {
+      return res.status(500).json(formatError('Keine Datenbankverbindung verfügbar'));
+    }
 
     // Check for exact duplicate combination: same identnr + merkmal + auspraegung + drucktext
     const duplicateCheck = await pool.request()
@@ -183,7 +192,10 @@ const updateMerkmalstext = async (req, res, next) => {
   const { identnr, merkmal, auspraegung, drucktext, sondermerkmal, position, sonderAbt, fertigungsliste } = req.body;
 
   try {
-    const pool = await poolPromise;
+    const pool = req.dbPool;
+    if (!pool) {
+      return res.status(500).json(formatError('Keine Datenbankverbindung verfügbar'));
+    }
 
     // Check if record exists
     const checkResult = await pool.request()
@@ -254,7 +266,10 @@ const patchMerkmalstext = async (req, res, next) => {
   }
 
   try {
-    const pool = await poolPromise;
+    const pool = req.dbPool;
+    if (!pool) {
+      return res.status(500).json(formatError('Keine Datenbankverbindung verfügbar'));
+    }
 
     // Check if record exists and get current values
     const checkResult = await pool.request()
@@ -333,7 +348,10 @@ const deleteMerkmalstext = async (req, res, next) => {
   }
 
   try {
-    const pool = await poolPromise;
+    const pool = req.dbPool;
+    if (!pool) {
+      return res.status(500).json(formatError('Keine Datenbankverbindung verfügbar'));
+    }
 
     // Check if record exists
     const checkResult = await pool.request()
@@ -368,7 +386,10 @@ const getSimilarDatasets = async (req, res, next) => {
   }
 
   try {
-    const pool = await poolPromise;
+    const pool = req.dbPool;
+    if (!pool) {
+      return res.status(500).json(formatError('Keine Datenbankverbindung verfügbar'));
+    }
 
     // Get original record details
     const originalRecord = await pool.request()

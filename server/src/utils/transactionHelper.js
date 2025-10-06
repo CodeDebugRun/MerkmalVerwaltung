@@ -3,7 +3,7 @@
  * Provides transaction management for database operations
  */
 
-const { sql } = require('../db');
+const sql = require('mssql');
 
 /**
  * Execute a function within a database transaction

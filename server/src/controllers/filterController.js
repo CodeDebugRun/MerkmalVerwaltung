@@ -1,4 +1,4 @@
-const { poolPromise, sql } = require('../db');
+const sql = require('mssql');
 const { formatSuccess, formatError, formatValidationError } = require('../utils/responseFormatter');
 
 // Funktion zum gefilterten Abrufen von Merkmalstexten - Legacy merkmalstexte.jsp functionality
@@ -6,7 +6,18 @@ const getFilteredMerkmalstexte = async (req, res, next) => {
   const { identnr, merkmal, auspraegung, drucktext, sondermerkmal, position, sonderAbt, fertigungsliste, quickSearch, page, limit } = req.query;
 
   try {
-    const pool = await poolPromise;
+
+
+    const pool = req.dbPool;
+
+
+    if (!pool) {
+
+
+      return res.status(500).json(formatError('Keine Datenbankverbindung verfügbar'));
+
+
+    }
     const request = pool.request();
 
     // Extract pagination parameters with defaults and validation

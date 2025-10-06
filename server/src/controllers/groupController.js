@@ -1,4 +1,4 @@
-const { poolPromise, sql } = require('../db');
+const sql = require('mssql');
 const { formatSuccess, formatError, formatValidationError } = require('../utils/responseFormatter');
 const { withTransaction, createRequest } = require('../utils/transactionHelper');
 
@@ -6,7 +6,18 @@ const { withTransaction, createRequest } = require('../utils/transactionHelper')
 const getGroupedMerkmalstexte = async (req, res, next) => {
 
   try {
-    const pool = await poolPromise;
+
+
+    const pool = req.dbPool;
+
+
+    if (!pool) {
+
+
+      return res.status(500).json(formatError('Keine Datenbankverbindung verfügbar'));
+
+
+    }
 
     // No backend pagination - return all grouped records
 
@@ -166,7 +177,18 @@ const updateGroupedMerkmalstexte = async (req, res, next) => {
   }
 
   try {
-    const pool = await poolPromise;
+
+
+    const pool = req.dbPool;
+
+
+    if (!pool) {
+
+
+      return res.status(500).json(formatError('Keine Datenbankverbindung verfügbar'));
+
+
+    }
     const transaction = new sql.Transaction(pool);
     await transaction.begin();
 
@@ -246,7 +268,18 @@ const bulkDeleteByGroupData = async (req, res, next) => {
   });
 
   try {
-    const pool = await poolPromise;
+
+
+    const pool = req.dbPool;
+
+
+    if (!pool) {
+
+
+      return res.status(500).json(formatError('Keine Datenbankverbindung verfügbar'));
+
+
+    }
     const transaction = new sql.Transaction(pool);
     await transaction.begin();
 
@@ -302,7 +335,18 @@ const copyGroupData = async (req, res, next) => {
   }
 
   try {
-    const pool = await poolPromise;
+
+
+    const pool = req.dbPool;
+
+
+    if (!pool) {
+
+
+      return res.status(500).json(formatError('Keine Datenbankverbindung verfügbar'));
+
+
+    }
 
     // Find all records that match the group criteria
     const result = await pool.request()
@@ -364,7 +408,18 @@ const createGroupFromCopy = async (req, res, next) => {
   }
 
   try {
-    const pool = await poolPromise;
+
+
+    const pool = req.dbPool;
+
+
+    if (!pool) {
+
+
+      return res.status(500).json(formatError('Keine Datenbankverbindung verfügbar'));
+
+
+    }
     const transaction = new sql.Transaction(pool);
     await transaction.begin();
 

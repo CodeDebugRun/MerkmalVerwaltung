@@ -1,4 +1,4 @@
-const { poolPromise, sql } = require('../db');
+const sql = require('mssql');
 const { formatSuccess, formatError, formatValidationError } = require('../utils/responseFormatter');
 const { validateMerkmalstexte, validateId } = require('../utils/validation');
 const { withTransaction, createRequest } = require('../utils/transactionHelper');
@@ -22,7 +22,10 @@ const bulkUpdateMerkmalstextePositions = async (req, res, next) => {
   }
   
   try {
-    const pool = await poolPromise;
+    const pool = req.dbPool;
+    if (!pool) {
+      return res.status(500).json(formatError('Keine Datenbankverbindung verfügbar'));
+    }
     
     // Execute bulk position update within transaction
     await withTransaction(pool, async (transaction) => {
@@ -39,7 +42,10 @@ const bulkUpdateMerkmalstextePositions = async (req, res, next) => {
 const checkNullIds = async (req, res, next) => {
   
   try {
-    const pool = await poolPromise;
+    const pool = req.dbPool;
+    if (!pool) {
+      return res.status(500).json(formatError('Keine Datenbankverbindung verfügbar'));
+    }
     
     const result = await pool.request()
       .query(`
@@ -76,7 +82,10 @@ const checkNullIds = async (req, res, next) => {
 const checkDuplicateIdentnrs = async (req, res, next) => {
   
   try {
-    const pool = await poolPromise;
+    const pool = req.dbPool;
+    if (!pool) {
+      return res.status(500).json(formatError('Keine Datenbankverbindung verfügbar'));
+    }
     
     const result = await pool.request()
       .query(`
@@ -144,7 +153,10 @@ const checkDuplicateIdentnrs = async (req, res, next) => {
 const getGroupedMerkmalstexte = async (req, res, next) => {
 
   try {
-    const pool = await poolPromise;
+    const pool = req.dbPool;
+    if (!pool) {
+      return res.status(500).json(formatError('Keine Datenbankverbindung verfügbar'));
+    }
 
     // No backend pagination - return all grouped records
 
@@ -362,7 +374,10 @@ const copyGroupData = async (req, res, next) => {
   }
 
   try {
-    const pool = await poolPromise;
+    const pool = req.dbPool;
+    if (!pool) {
+      return res.status(500).json(formatError('Keine Datenbankverbindung verfügbar'));
+    }
 
     // Build WHERE clause for group matching
     let whereClause = 'merkmal = @merkmal AND auspraegung = @auspraegung AND drucktext = @drucktext';
@@ -434,7 +449,10 @@ const createGroupFromCopy = async (req, res, next) => {
   }
 
   try {
-    const pool = await poolPromise;
+    const pool = req.dbPool;
+    if (!pool) {
+      return res.status(500).json(formatError('Keine Datenbankverbindung verfügbar'));
+    }
 
     // Use position 0 if not provided
     const finalPosition = merkmalsposition ? parseInt(merkmalsposition) : 0;

@@ -682,7 +682,8 @@ export default function Home() {
 
       // 2. Delete records for removed identnrs
       for (const identnr of identnrsToRemove) {
-        const deleteResponse = await deleteWithDbConfig(`${API_BASE}/identnr/${identnr}`);
+        const deleteResponse = await deleteWithDbConfig(`${API_BASE}/identnr/${identnr}`
+        });
 
         if (!deleteResponse.ok) {
           // 404 is acceptable - identnr might already be deleted or not exist
@@ -724,7 +725,12 @@ export default function Home() {
                 };
 
 
-                const updateResponse = await putWithDbConfig(`${API_BASE}/${record.id}`, updateData);
+                const updateResponse = await putWithDbConfig(`${API_BASE}/${record.id}`, {,
+                  headers: {
+                    'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify(updateData)
+                });
 
                 if (!updateResponse.ok) {
                   const errorText = await updateResponse.text();
@@ -775,7 +781,12 @@ export default function Home() {
       };
 
       // Call copy API
-      const response = await postWithDbConfig(`${getApiUrl()}/grouped/merkmalstexte/copy-group`, copyData);
+      const response = await postWithDbConfig(`${getApiUrl()}/grouped/merkmalstexte/copy-group`, {,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(copyData)
+      });
 
       if (!response.ok) {
         throw new Error(`Failed to copy group data: ${response.status}`);
@@ -845,7 +856,11 @@ export default function Home() {
       setOperationLoading(prev => ({ ...prev, clone: true }));
       setCloneError(null); // Clear any previous errors
 
-      const response = await postWithDbConfig(`${BASE_URL}/identnrs/clone`, { sourceIdentnr, targetIdentnr });
+      const response = await postWithDbConfig(`${BASE_URL}/identnrs/clone`, {,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ sourceIdentnr, targetIdentnr });
 
       const result = await response.json();
 
@@ -1023,16 +1038,20 @@ export default function Home() {
       const [firstIdentnr, ...otherIdentnrs] = selectedIdentnrs;
 
       // Create the first record
-      const firstResponse = await postWithDbConfig(`${API_BASE}`, {
-        identnr: firstIdentnr,
-        merkmal: formData.merkmal,
-        auspraegung: formData.auspraegung,
-        drucktext: formData.drucktext,
-        sondermerkmal: formData.sondermerkmal || '',
-        position: formData.position ? parseInt(formData.position) : 0,
-        sonderAbt: formData.sonderAbt || '0',
-        fertigungsliste: formData.fertigungsliste || '0'
-      });
+      const firstResponse = await postWithDbConfig(`${API_BASE}`, {,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          identnr: firstIdentnr,
+          merkmal: formData.merkmal,
+          auspraegung: formData.auspraegung,
+          drucktext: formData.drucktext,
+          sondermerkmal: formData.sondermerkmal || '',
+          position: formData.position ? parseInt(formData.position) : 0,
+          sonderAbt: formData.sonderAbt || '0',
+          fertigungsliste: formData.fertigungsliste || '0'
+        });
 
       if (!firstResponse.ok) {
         const errorData = await firstResponse.json();
@@ -1047,9 +1066,13 @@ export default function Home() {
 
       // If there are other identnrs, copy the first record to them
       if (otherIdentnrs.length > 0) {
-        const copyResponse = await postWithDbConfig(`${API_BASE}/${recordId}/copy-to-identnrs`, {
-          identnrs: selectedIdentnrs // All identnrs including the first one
-        });
+        const copyResponse = await postWithDbConfig(`${API_BASE}/${recordId}/copy-to-identnrs`, {,
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            identnrs: selectedIdentnrs // All identnrs including the first one
+          });
 
         if (!copyResponse.ok) {
           throw new Error(`Failed to copy record to other identnrs`);

@@ -6,6 +6,7 @@ const { poolPromise } = require('./db');
 const errorHandler = require('./middleware/errorHandler');
 const { formatSuccess, formatError } = require('./utils/responseFormatter');
 const connectionManager = require('./utils/connectionManager');
+const dbConnectionMiddleware = require('./middleware/dbConnectionMiddleware');
 const app = express();
 
 // Security middleware
@@ -27,6 +28,9 @@ console.log('⚠️  Rate limiting komplett deaktiviert für Entwicklung');
 app.use('/api', connectionManager.healthCheckMiddleware());
 
 app.use(express.json());
+
+// Database connection middleware - must be after express.json()
+app.use(dbConnectionMiddleware);
 
 // Routen importieren
 const merkmalstexteRoutes = require('./routes/merkmalstexteRoutes');

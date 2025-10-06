@@ -1,4 +1,4 @@
-const { poolPromise, sql } = require('../db');
+const sql = require('mssql');
 const { formatSuccess, formatError, formatValidationError } = require('../utils/responseFormatter');
 const { validateMerkmalstexte, validateId } = require('../utils/validation');
 const { withTransaction, createRequest } = require('../utils/transactionHelper');
@@ -9,7 +9,14 @@ const {
 // Get all unique Ident-Nr values (simple list)
 const getAllIdentnrs = async (req, res, next) => {
   try {
-    const pool = await poolPromise;
+
+    const pool = req.dbPool;
+
+    if (!pool) {
+
+      return res.status(500).json(formatError('Keine Datenbankverbindung verfügbar'));
+
+    }
 
     const result = await pool.request()
       .query(`
@@ -31,7 +38,14 @@ const getAllIdentnrs = async (req, res, next) => {
 // Get count of unique Ident-Nr values with statistics
 const getIdentnrCount = async (req, res, next) => {
   try {
-    const pool = await poolPromise;
+
+    const pool = req.dbPool;
+
+    if (!pool) {
+
+      return res.status(500).json(formatError('Keine Datenbankverbindung verfügbar'));
+
+    }
 
     const result = await pool.request()
       .query(`
@@ -66,7 +80,18 @@ const getMerkmalstexteByIdentnr = async (req, res, next) => {
   }
 
   try {
-    const pool = await poolPromise;
+
+
+    const pool = req.dbPool;
+
+
+    if (!pool) {
+
+
+      return res.status(500).json(formatError('Keine Datenbankverbindung verfügbar'));
+
+
+    }
 
     const result = await pool.request()
       .input('identnr', sql.VarChar, identnr)
@@ -109,7 +134,18 @@ const createMerkmalstextForIdentnr = async (req, res, next) => {
   }
 
   try {
-    const pool = await poolPromise;
+
+
+    const pool = req.dbPool;
+
+
+    if (!pool) {
+
+
+      return res.status(500).json(formatError('Keine Datenbankverbindung verfügbar'));
+
+
+    }
 
     // Check for exact duplicate combination
     const duplicateCheck = await pool.request()
@@ -180,7 +216,18 @@ const deleteMerkmalstexteByIdentnr = async (req, res, next) => {
   }
 
   try {
-    const pool = await poolPromise;
+
+
+    const pool = req.dbPool;
+
+
+    if (!pool) {
+
+
+      return res.status(500).json(formatError('Keine Datenbankverbindung verfügbar'));
+
+
+    }
 
     // Execute within transaction for data integrity
     const result = await withTransaction(pool, async (transaction) => {
@@ -221,7 +268,18 @@ const addCustomIdentnr = async (req, res, next) => {
   const trimmedIdentnr = identnr.trim();
 
   try {
-    const pool = await poolPromise;
+
+
+    const pool = req.dbPool;
+
+
+    if (!pool) {
+
+
+      return res.status(500).json(formatError('Keine Datenbankverbindung verfügbar'));
+
+
+    }
 
     // Check if identnr already exists
     const existsResult = await pool.request()
@@ -291,7 +349,18 @@ const cloneIdentnr = async (req, res, next) => {
   }
 
   try {
-    const pool = await poolPromise;
+
+
+    const pool = req.dbPool;
+
+
+    if (!pool) {
+
+
+      return res.status(500).json(formatError('Keine Datenbankverbindung verfügbar'));
+
+
+    }
 
     // Check if target identnr already has records
     const checkResult = await pool.request()
@@ -380,7 +449,18 @@ const copyRecordToMultipleIdentnrs = async (req, res, next) => {
   }
 
   try {
-    const pool = await poolPromise;
+
+
+    const pool = req.dbPool;
+
+
+    if (!pool) {
+
+
+      return res.status(500).json(formatError('Keine Datenbankverbindung verfügbar'));
+
+
+    }
 
     // Get original record
     const originalResult = await pool.request()
