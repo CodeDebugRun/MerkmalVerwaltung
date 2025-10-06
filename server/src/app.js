@@ -32,6 +32,7 @@ app.use(express.json());
 const merkmalstexteRoutes = require('./routes/merkmalstexteRoutes');
 const groupedRoutes = require('./routes/groupedRoutes');
 const identnrRoutes = require('./routes/identnrRoutes');
+const databaseRoutes = require('./routes/databaseRoutes');
 
 // Test endpoint
 app.get('/', (req, res) => {
@@ -52,6 +53,7 @@ app.get('/db-test', async (req, res) => {
 app.use('/api', merkmalstexteRoutes);
 app.use('/api/grouped', groupedRoutes);
 app.use('/api', identnrRoutes);
+app.use('/api/database', databaseRoutes);
 
 // Global error handling middleware (must be last)
 app.use(errorHandler);

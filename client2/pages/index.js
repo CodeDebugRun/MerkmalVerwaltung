@@ -986,9 +986,14 @@ export default function Home() {
     showSuccess(isDarkMode ? '☀️ Light Mode aktiviert' : '🌙 Dark Mode aktiviert');
   };
 
-
   const handleCloseSettings = () => {
     setShowSettings(false);
+  };
+
+  const handleDatabaseSettingsChange = (dbSettings) => {
+    // Refresh data with new database settings
+    fetchMerkmalstexte(true);
+    showSuccess('✅ Datenbankeinstellungen gespeichert und Daten aktualisiert');
   };
 
   // Form handlers
@@ -1252,6 +1257,7 @@ export default function Home() {
           darkMode={isDarkMode}
           onToggleDarkMode={handleToggleDarkMode}
           onClose={handleCloseSettings}
+          onDatabaseSettingsChange={handleDatabaseSettingsChange}
         />
 
         <IdentnrCloneModal

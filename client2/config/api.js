@@ -1,16 +1,38 @@
 // API Configuration - Centralized API base URL management
 
+// Check if custom API URL is stored in localStorage (from database settings)
+const getStoredApiUrl = () => {
+  if (typeof window !== 'undefined') {
+    const dbSettings = localStorage.getItem('dbSettings');
+    if (dbSettings) {
+      try {
+        const parsed = JSON.parse(dbSettings);
+        if (parsed.host) {
+          // If database settings exist, use them to construct API URL
+          const port = parsed.port || '3001';
+          return `http://${parsed.host}:${port}/api`;
+        }
+      } catch (e) {
+        console.error('Error parsing stored database settings:', e);
+      }
+    }
+  }
+  return null;
+};
+
 export const API_CONFIG = {
-  // Base URL for backend API
-  BASE_URL: process.env.NODE_ENV === 'production'
+  // Base URL for backend API - check stored settings first
+  BASE_URL: getStoredApiUrl() || (process.env.NODE_ENV === 'production'
     ? process.env.NEXT_PUBLIC_API_URL || 'https://your-production-api.com/api'
-    : 'http://localhost:3001/api',
+    : 'http://localhost:3001/api'),
 
   // API endpoints
   ENDPOINTS: {
     MERKMALSTEXTE: '/merkmalstexte',
     IDENTNRS: '/identnrs',
-    FILTER: '/merkmalstexte/filter'
+    FILTER: '/merkmalstexte/filter',
+    DATABASE_TEST: '/database/test',
+    DATABASE_INFO: '/database/info'
   }
 };
 
